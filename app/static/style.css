@@ -1087,14 +1087,14 @@ body{overflow-x:hidden!important;max-width:none!important}
 .credit{
   position:fixed;right:18px;bottom:11px;z-index:30;
   font-size:11px;line-height:1;letter-spacing:.02em;
-  color:var(--dim);opacity:.5;
+  color:var(--fg);opacity:.45;
   pointer-events:none;user-select:none;
   transition:opacity .2s ease;
 }
-.credit b{font-weight:600;color:var(--fg);opacity:.85}
-body:hover .credit{opacity:.62}
+.credit b{font-weight:600;color:var(--fg);opacity:.9}
+body:hover .credit{opacity:.6}
 :root[data-skin="geek"] .credit{letter-spacing:.08em}
 :root[data-skin="geek"] .credit b{color:var(--acc)}
-:root[data-skin="pixel"] .credit{font-size:11.5px;opacity:.6}
-:root[data-skin="pixel"] .credit b{color:var(--acc2)}
+:root[data-skin="pixel"] .credit{font-size:11.5px;opacity:.7;letter-spacing:.04em}
+:root[data-skin="pixel"] .credit b{color:var(--fg);opacity:1}
 @media print{.credit{display:none}}
