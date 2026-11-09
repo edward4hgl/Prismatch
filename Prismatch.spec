@@ -43,7 +43,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:/Users/edwar/Documents/deepseek-harness/default-workspace/tocheck-next/mockups/icon.ico'],
+    icon=['mockups/icon.ico'],
 )
 coll = COLLECT(
     exe,

@@ -58,7 +58,7 @@ python run_check.py --group 单位A=.\标书A --group 单位B=.\标书B --tender
 ## 打包成免安装目录版
 
 ```powershell
-pyinstaller "棱镜 Prismatch.spec"
+pyinstaller Prismatch.spec
 # 产物：dist\Prismatch\Prismatch.exe
 ```
 
