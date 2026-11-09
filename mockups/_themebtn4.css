@@ -1,0 +1,7 @@
+
+/* ---- 皮肤文字垂直对齐：让包装层也拉伸 ---- */
+:root[data-skin] .switcher .skin-wrap{display:flex!important;align-items:stretch!important}
+:root[data-skin] .switcher #skinBtn{height:100%!important;display:flex!important;
+  align-items:center!important;justify-content:center!important}
+:root[data-skin] .switcher{min-height:36px}
+:root[data-skin] .switcher #themeBtn{height:100%!important}

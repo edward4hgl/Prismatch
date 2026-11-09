@@ -1,0 +1,14 @@
+
+/* ---- 合并开关：文字字体/字号统一（#skinBtn 去掉 ghost 类后丢了 font:inherit） ---- */
+:root[data-skin] .switcher #skinBtn,
+:root[data-skin] .switcher #themeBtn{
+  font-family:inherit!important;font-size:13px!important;font-weight:400!important;
+  color:var(--fg)!important;background:transparent!important;border:0!important;
+  cursor:pointer!important;line-height:1.25!important;
+}
+:root[data-skin] .switcher #skinBtn{padding:8px 16px!important}
+:root[data-skin] .switcher #themeBtn{font-size:0!important}
+:root[data-skin] .switcher #themeBtn::before{
+  width:15px!important;height:15px!important}
+:root[data-skin="pixel"] .switcher #themeBtn::before{width:16px!important;height:16px!important}
+:root[data-skin="pixel"] .switcher #skinBtn{font-size:12px!important;padding:8px 14px!important}

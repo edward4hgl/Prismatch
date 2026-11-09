@@ -1,0 +1,23 @@
+
+/* ---- 深浅修正：文字与次要按钮 ---- */
+:root[data-skin="geek"][data-theme="light"] .card .step,
+:root[data-skin="geek"][data-theme="light"] .card .row{color:#1d3b2a!important}
+:root[data-skin="geek"][data-theme="light"] .card .note,
+:root[data-skin="geek"][data-theme="light"] .card .count{color:#5d7a68!important}
+:root[data-skin="geek"][data-theme="light"] .ghost{background:#f2f7f1!important;color:#1d3b2a!important;
+  border:1px solid #b9d3c3!important;border-radius:0!important}
+:root[data-skin="geek"][data-theme="light"] .tab{color:#5d7a68!important}
+:root[data-skin="geek"][data-theme="light"] .tab.active{background:#128a4f!important;color:#fff!important}
+:root[data-skin="geek"][data-theme="light"] .brand-txt h1 em{color:#128a4f!important;-webkit-text-fill-color:#128a4f!important}
+
+:root[data-skin="pixel"][data-theme="dark"] .card .step,
+:root[data-skin="pixel"][data-theme="dark"] .card .row{color:#f0e6f7!important}
+:root[data-skin="pixel"][data-theme="dark"] .card .note,
+:root[data-skin="pixel"][data-theme="dark"] .card .count{color:#b9a7c7!important}
+:root[data-skin="pixel"][data-theme="dark"] .ghost{background:#2d2638!important;color:#f0e6f7!important;
+  border:2px solid #e2cdf0!important;box-shadow:0 3px 0 #3a3048!important}
+:root[data-skin="pixel"][data-theme="dark"] .tab{color:#b9a7c7!important}
+:root[data-skin="pixel"][data-theme="dark"] .tab.active{background:#ffa8c6!important;color:#241f2e!important;
+  border:2px solid #f0e6f7!important}
+:root[data-skin="pixel"][data-theme="dark"] .brand-txt h1 em{color:#ffa8c6!important;
+  -webkit-text-fill-color:#ffa8c6!important}

@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# 构建产物
+build/
+dist/
+*.spec.bak
+.buildenv/
+
+# 运行时数据（报告、解析缓存、日志、上传副本）
+data/
+logs/
+
+# 测试样本
+samples/
+samples2/
+samples3/
+samples4/
+samples5/
+samples6/
+samples7/
+samples8/
+
+# 第三方位图里的巨型二进制（本项目未使用，改用 pip 安装）
+vendor/imageio_ffmpeg/
+vendor/imageio_ffmpeg-*.dist-info/
+vendor/bin/
+vendor/__pycache__/
+
+# 旧版商业资料与过程截图
+docs/
+
+# 界面截图（README 引用的保留在 mockups/png 下）
+mockups/*.html
+mockups/png/*.png
+!mockups/png/layout-apple.png
+
+# 其它
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini

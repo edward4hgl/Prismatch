@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-skin="apple">
+<head>
+<script>
+(function () {
+  try {
+    var q = new URLSearchParams(location.search).get("skin");
+    var skin = q || localStorage.getItem("tc-skin") || "apple";
+    document.documentElement.dataset.skin = skin;
+    var saved = new URLSearchParams(location.search).get("theme") || localStorage.getItem("tc-theme");
+    if (!saved) {
+      var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      saved = dark ? "dark" : "light";
+    }
+    document.documentElement.dataset.theme = saved;
+  } catch (e) {}
+})();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>棱镜 Prismatch</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="b b1"></i><i class="b b2"></i><i class="b b3"></i></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 120 120" width="28" height="28" class="brand-mark" aria-label="棱镜 Prismatch"><defs><clipPath id="prismClip"><path d="M50 24 L86 88 H14 Z"/></clipPath></defs><path class="pm-back" d="M70 24 L106 88 H34 Z" fill="none" stroke="currentColor" stroke-opacity=".34" stroke-width="7" stroke-linejoin="round"/><path class="pm-front" d="M50 24 L86 88 H14 Z" fill="none" stroke-width="8" stroke-linejoin="round"/><g clip-path="url(#prismClip)"><path class="pm-fill" d="M70 24 L106 88 H34 Z" fill-opacity=".2"/></g></svg>
+    <b>棱镜 <em>Prismatch</em></b>
+  </div>
+  <nav class="tabs" id="mainTabs">
+    <button class="tab active" data-page="check">标书查重</button>
+    <button class="tab" data-page="reports">标书报告</button>
+    <button class="tab" data-page="lib">自建库查重</button>
+    <button class="tab" data-page="libreport">自建库报告</button>
+    <button class="tab" data-page="libmanage">自建库管理</button>
+  </nav>
+  <div class="top-actions">
+    <button id="logBtn" class="ghost">日志</button>
+    <div class="switcher">
+      <div class="skin-wrap">
+        <button id="skinBtn" title="切换皮肤">皮肤</button>
+        <div id="skinMenu" class="skin-menu hidden">
+          <button data-skin="apple"><i class="sw sw-apple"></i>液态玻璃</button>
+          <button data-skin="geek"><i class="sw sw-geek"></i>极客终端</button>
+          <button data-skin="pixel"><i class="sw sw-pixel"></i>可爱像素</button>
+        </div>
+      </div>
+      <button id="themeBtn" class="icon" title="浅色 / 深色">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ 标书查重 ============ -->
+  <section id="page-check" class="page">
+    <div class="mode-bar">
+      <div class="subtabs" id="subTabs">
+        <button class="sub" data-mode="normal">普通查重</button>
+        <button class="sub active" data-mode="group">分组查重</button>
+      </div>
+      <p class="note" id="modeNote">对提交的两个或多个投标文档自动分组后进行两两互比，比对内容包括文字和图片，找出相似内容，发现和规避围标串标风险。</p>
+    </div>
+
+    <div class="intake">
+      <div class="card">
+        <div class="row">
+          <span class="step">第一步　导入对比文件</span>
+          <button class="mini" id="btnPath">从路径导入</button>
+          <button class="mini" id="btnFiles">文件导入</button>
+          <span class="count">当前文档数：<b id="docCount">0</b></span>
+          <button class="mini" id="selAllC">全选</button>
+          <button class="mini danger" id="delSelC">删除选中</button>
+        </div>
+        <div id="dropC" class="dropzone">也可拖拽文件夹到这里 · 每个文件夹自动成为一组（可一次拖多个）</div>
+        <table class="tbl"><thead><tr><th>文件名</th><th>路径</th><th class="w-act">操作</th></tr></thead>
+          <tbody id="tblCompare"><tr class="empty"><td colspan="3">表中无内容</td></tr></tbody></table>
+        <p class="note small">支持 txt、doc、docx、ppt、pptx、可编辑的 pdf。</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="step">第二步　导入招标文件</span>
+          <button class="mini" id="btnTenderPath">从路径导入</button>
+          <button class="mini" id="btnTenderFiles">文件导入</button>
+          <span class="count dim">可选，相同内容将被剔除</span>
+          <button class="mini" id="selAllT">全选</button>
+          <button class="mini danger" id="delSelT">删除选中</button>
+        </div>
+        <div id="dropT" class="dropzone small">拖拽招标文件夹到这里（其内容将作为白名单剔除）</div>
+        <table class="tbl"><thead><tr><th>文件名</th><th>路径</th><th class="w-act">操作</th></tr></thead>
+          <tbody id="tblTender"><tr class="empty"><td colspan="3">表中无内容</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <div class="submitbar">
+      <div class="submit-slot">
+        <button id="runBtn" class="primary act-btn" disabled>提交检测</button>
+        <button id="stopBtn" class="primary act-btn stop hidden">停止检测</button>
+      </div>
+      <span id="runHint" class="hint"></span>
+    </div>
+
+    <div id="progress" class="card hidden">
+      <div class="prog-head">
+        <div class="spinner"></div>
+        <div><h3 id="progTitle">正在解析文档…</h3><p id="progSub" class="note small">准备中</p></div>
+        <div class="prog-right">
+          <div id="progPct" class="pct">0%</div>
+          <div id="progTime" class="ptime">已用 00:00 · 剩余 估算中</div>
+        </div>
+      </div>
+      <div class="pbar">
+        <div class="pbar-track" id="barTrack">
+          <i id="barFill"></i>
+        </div>
+        <div class="pbar-steps" id="barSteps"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 报告列表 ============ -->
+  <section id="page-reports" class="page hidden">
+    <h2 class="h2">标书报告</h2>
+    <p class="note small" style="margin-top:-8px">按最高重复率从高到低排序</p>
+    <div id="reportList" class="report-list"></div>
+  </section>
+
+  <!-- ============ 报告详情 ============ -->
+  <section id="page-report" class="page hidden">
+    <div class="repbar">
+      <button class="mini" id="backReports">← 返回报告列表</button>
+      <div class="spectabs" id="specTabs">
+        <button class="tab2 active" data-view="summary">汇总</button>
+        <button class="tab2" data-view="sentence">相似句子</button>
+        <button class="tab2" data-view="para">相似段落</button>
+        <button class="tab2" data-view="pic">相似图片</button>
+        <button class="tab2" data-view="print">打印报告</button>
+      </div>
+      <button class="mini" id="expBtn">导出 HTML</button>
+    </div>
+    <div id="view"></div>
+  </section>
+
+  <!-- ============ 占位 ============ -->
+  <section id="page-lib" class="page hidden"><div class="card empty-page"><h2 class="h2">自建库查重</h2><p class="note">先到「自建库管理」创建对比库，再在这里提交查重任务。</p><div class="soon">该模块在下一版接入</div></div></section>
+  <section id="page-libreport" class="page hidden"><div class="card empty-page"><h2 class="h2">自建库报告</h2><div class="soon">暂无报告</div></div></section>
+  <section id="page-libmanage" class="page hidden"><div class="card empty-page"><h2 class="h2">自建库管理</h2><p class="note">用于维护私有对比语料（历史投标文件、范文库等）。</p><div class="soon">该模块在下一版接入</div></div></section>
+</main>
+
+<input id="fileInput" type="file" multiple hidden accept=".docx,.doc,.pdf,.pptx,.ppt,.xlsx,.txt">
+<input id="dirInput" type="file" webkitdirectory hidden>
+<input id="tenderInput" type="file" multiple hidden accept=".docx,.doc,.pdf,.pptx,.ppt,.xlsx,.txt">
+<div id="toast" class="toast"></div>
+<div class="credit" title="Developed by edward4hgl with DSH">Developed by <b>edward4hgl</b> with DSH</div>
+
+<aside id="logDrawer" class="drawer hidden">
+  <div class="drawer-head">
+    <b>运行日志</b><span id="logState" class="hint"></span>
+    <button class="mini" id="logCopy">复制</button>
+    <button class="mini" id="logClose">关闭</button>
+  </div>
+  <div id="logBody" class="log-body"></div>
+</aside>
+
+<script src="/static/vendor/jszip.min.js"></script>
+<script src="/static/vendor/docx-preview.min.js"></script>
+<script src="/static/report.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

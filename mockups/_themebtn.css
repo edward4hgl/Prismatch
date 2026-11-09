@@ -1,0 +1,16 @@
+
+/* ---- 日夜按钮：用 CSS 画圆，避免不同字体下 ◐ 字形大小不一 ---- */
+:root[data-skin] .switcher #themeBtn{
+  display:grid;place-items:center;min-width:40px;align-self:stretch;
+  font-size:0;line-height:0;padding:0 12px!important;
+}
+:root[data-skin] .switcher #themeBtn::before{
+  content:"";display:block;width:15px;height:15px;border-radius:50%;
+  border:1.5px solid currentColor;
+  background:linear-gradient(90deg,currentColor 0 50%,transparent 50% 100%);
+  box-sizing:border-box;
+}
+/* 像素皮肤：圆也粗一点，匹配它的贴纸感 */
+:root[data-skin="pixel"] .switcher #themeBtn::before{
+  width:16px;height:16px;border-width:2.5px;
+}

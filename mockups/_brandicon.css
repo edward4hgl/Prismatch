@@ -1,0 +1,11 @@
+
+/* ---- 品牌图标配色：前三角用强调色，后三角用文字色 ---- */
+.brand-mark .pm-front{stroke:#0a84ff}
+.brand-mark .pm-fill{fill:#0a84ff}
+:root[data-skin="apple"][data-theme="dark"] .brand-mark .pm-front{stroke:#5ac8fa}
+:root[data-skin="apple"][data-theme="dark"] .brand-mark .pm-fill{fill:#5ac8fa}
+:root[data-skin="geek"] .brand-mark .pm-front{stroke:#39ff88}
+:root[data-skin="geek"] .brand-mark .pm-fill{fill:#39ff88}
+:root[data-skin="pixel"] .brand-mark .pm-front{stroke:#ff8fb7}
+:root[data-skin="pixel"] .brand-mark .pm-fill{fill:#ff8fb7}
+:root[data-skin="pixel"] .brand-mark .pm-back{stroke:#4a3b52;stroke-opacity:.45}

@@ -1,0 +1,12 @@
+
+/* ---- 提交栏与进度卡片的间距 ---- */
+.submitbar{margin-bottom:22px!important}
+#progress{margin-top:0!important}
+
+/* ---- 恢复普通进度条 ---- */
+.dog{display:none!important}
+.pbar-track{overflow:hidden!important;height:12px!important}
+#barFill{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .35s ease}
+.pbar{margin-top:20px}
+.pbar-steps{margin-top:10px}

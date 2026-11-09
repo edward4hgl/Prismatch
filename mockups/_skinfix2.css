@@ -1,0 +1,26 @@
+
+/* ---- 圆角一致性：极客皮肤 ----
+   顶栏标签、日志按钮、开关组统一到 9–12px，与容器圆角匹配 */
+:root[data-skin="geek"] .tab{border-radius:9px!important}
+:root[data-skin="geek"] .ghost{border-radius:10px!important}
+:root[data-skin="geek"] .mini{border-radius:9px!important}
+:root[data-skin="geek"] .card{border-radius:12px!important}
+:root[data-skin="geek"] .subtabs{border-radius:11px!important}
+:root[data-skin="geek"] .sub{border-radius:8px!important}
+:root[data-skin="geek"] .dropzone{border-radius:10px!important}
+:root[data-skin="geek"] .switcher{border-radius:11px!important;overflow:hidden}
+:root[data-skin="geek"] .switcher #skinBtn{border-radius:0!important}
+:root[data-skin="geek"] .switcher #themeBtn{border-radius:0!important}
+:root[data-skin="geek"] .tbl{border-radius:10px!important}
+
+/* ---- 液态玻璃深色：日志等次要按钮的可见性 ---- */
+:root[data-skin="apple"][data-theme="dark"] .ghost{
+  background:rgba(255,255,255,.10)!important;color:#e8ecf5!important;
+  border:1px solid rgba(255,255,255,.18)!important}
+:root[data-skin="apple"][data-theme="dark"] .ghost:hover{
+  background:rgba(255,255,255,.16)!important;color:#fff!important}
+:root[data-skin="apple"][data-theme="dark"] .switcher{background:rgba(255,255,255,.08)!important;
+  border-color:rgba(255,255,255,.18)!important}
+:root[data-skin="apple"][data-theme="dark"] .switcher #skinBtn,
+:root[data-skin="apple"][data-theme="dark"] .switcher #themeBtn{color:#e8ecf5!important}
+:root[data-skin="apple"][data-theme="dark"] .mini{color:#e8ecf5!important}

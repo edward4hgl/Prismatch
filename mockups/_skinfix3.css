@@ -1,0 +1,14 @@
+
+/* ---- 极客浅色：圆角覆盖（此前的浅色规则权重更高，需同级覆盖） ---- */
+:root[data-skin="geek"][data-theme="light"] .ghost{border-radius:10px!important}
+:root[data-skin="geek"][data-theme="light"] .mini{border-radius:9px!important}
+:root[data-skin="geek"][data-theme="light"] .tab{border-radius:9px!important}
+:root[data-skin="geek"][data-theme="light"] .card{border-radius:12px!important}
+:root[data-skin="geek"][data-theme="light"] .subtabs{border-radius:11px!important}
+:root[data-skin="geek"][data-theme="light"] .sub{border-radius:8px!important}
+:root[data-skin="geek"][data-theme="light"] .dropzone{border-radius:10px!important}
+:root[data-skin="geek"][data-theme="light"] .switcher{border-radius:11px!important}
+:root[data-skin="geek"][data-theme="light"] .switcher #skinBtn,
+:root[data-skin="geek"][data-theme="light"] .switcher #themeBtn{border-radius:10px!important}
+:root[data-skin="geek"][data-theme="dark"] .switcher #skinBtn,
+:root[data-skin="geek"][data-theme="dark"] .switcher #themeBtn{border-radius:10px!important}

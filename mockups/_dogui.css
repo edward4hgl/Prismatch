@@ -1,0 +1,60 @@
+
+/* ================= 提交/停止：同一位置互换 ================= */
+.submitbar{display:flex!important;align-items:center!important;justify-content:center!important;
+  flex-wrap:wrap;gap:10px}
+.submit-slot{display:grid;place-items:center}
+.submit-slot > .act-btn{grid-area:1/1;min-width:240px;justify-self:center}
+.submit-slot > .hidden{display:none!important}
+.submitbar .hint{width:100%;text-align:center;margin:0}
+
+/* 停止态：统一做成红色大按钮，各皮肤只换色值 */
+.act-btn.stop{background:#ff3b30!important;border-color:#ff3b30!important;color:#fff!important;
+  box-shadow:0 18px 34px -22px rgba(255,59,48,.9)!important}
+:root[data-skin="geek"] .act-btn.stop{background:#c0392b!important;border:1px solid #ff6b6b!important;
+  color:#ffe8e6!important;box-shadow:none!important;border-radius:9px!important}
+:root[data-skin="pixel"] .act-btn.stop{background:#ff8f9e!important;border:3px solid #4a3b52!important;
+  color:#3a2b31!important;box-shadow:0 5px 0 #e6a8c6!important}
+
+/* ================= 进度条：分步文字居中 ================= */
+.pbar-steps{display:flex!important;margin-top:10px!important}
+.pbar-steps .step-item{flex:1 1 0!important;text-align:center!important;
+  border-right:1px solid var(--line);padding:2px 4px!important;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pbar-steps .step-item:last-child{border-right:0}
+.pbar-steps .step-item.active{color:var(--fg);font-weight:600}
+.pbar-steps .step-item.done{color:var(--acc2)}
+
+/* ================= 进度条：比熊犬在跑 ================= */
+.pbar-track{position:relative!important;overflow:visible!important;height:16px!important}
+#barFill{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .35s ease}
+
+.dog{position:absolute;top:50%;left:0;width:52px;height:38px;pointer-events:none;
+  left:calc(var(--p,0) * 1% + 10px);
+  transform:translate(-50%,-62%);transition:left .35s ease;z-index:2}
+.dog svg{width:100%;height:100%;overflow:visible}
+.dog .dog-torso,.dog .dog-head,.dog .dog-ear,.dog .dog-tail{fill:#fff;
+  stroke:#c9d2e0;stroke-width:1.6}
+.dog .dog-eye{fill:#2b3240}
+.dog .dog-nose{fill:#3a4152}
+.dog .dog-collar{fill:var(--acc)}
+.dog .dog-shadow{fill:rgba(0,0,0,.16)}
+.dog .dog-body{animation:dogBob .34s ease-in-out infinite;transform-origin:50% 80%}
+.dog .leg{transform-origin:center 34px;animation:dogLeg .34s linear infinite}
+.dog .leg.b{animation-delay:-.17s}
+@keyframes dogBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes dogLeg{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(20deg)}}
+
+/* 深色皮肤：白狗带一点冷色描边，避免糊在背景里 */
+:root[data-theme="dark"] .dog .dog-torso,
+:root[data-theme="dark"] .dog .dog-head,
+:root[data-theme="dark"] .dog .dog-ear,
+:root[data-theme="dark"] .dog .dog-tail{stroke:#7f8ea6}
+:root[data-skin="geek"] .dog .dog-torso,
+:root[data-skin="geek"] .dog .dog-head,
+:root[data-skin="geek"] .dog .dog-ear,
+:root[data-skin="geek"] .dog .dog-tail{fill:#cfe9d8;stroke:#39ff88}
+:root[data-skin="pixel"] .dog .dog-torso,
+:root[data-skin="pixel"] .dog .dog-head,
+:root[data-skin="pixel"] .dog .dog-ear,
+:root[data-skin="pixel"] .dog .dog-tail{fill:#fff;stroke:#4a3b52;stroke-width:2.4}

@@ -1,0 +1,10 @@
+
+/* ---- 日夜按钮垂直居中修正 ---- */
+:root[data-skin] .switcher{align-items:stretch!important}
+:root[data-skin] .switcher #skinBtn{display:flex!important;align-items:center!important;
+  justify-content:center!important;padding:8px 14px!important;line-height:1.2!important}
+:root[data-skin] .switcher #themeBtn{display:flex!important;align-items:center!important;
+  justify-content:center!important;padding:0 12px!important;min-width:40px!important;
+  line-height:1!important;font-size:0!important}
+:root[data-skin] .switcher #themeBtn::before{margin:0!important;flex:0 0 auto!important;
+  display:block!important;position:static!important;transform:none!important}
