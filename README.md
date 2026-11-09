@@ -52,7 +52,7 @@ python run.py --no-browser
 命令行批处理（无界面）：
 
 ```powershell
-python run_check.py --group 广东=.\广东查重 --group 华北=.\华北查重 --tender .\招标文件 --out .\结果
+python run_check.py --group 单位A=.\标书A --group 单位B=.\标书B --tender .\招标文件 --out .\结果
 ```
 
 ## 打包成免安装目录版
@@ -95,18 +95,20 @@ run_check.py     命令行批处理入口
 vendor/          运行时用到的纯 Python 依赖
 ```
 
-## 附：与旧版（ToCheck 查重）的差异
+## 附：与市面上某商业查重软件的思路差异
 
-旧版是 JavaFX 17 + Lucene 4.5 的商用软件（`com.writehelp.selfcheck`），机器码激活。逆向结论与替代方案：
+市面上的同类产品多为「专业引擎 + 授权绑定」路线：文档解析交给重量级 Java 库，全文检索依赖分词词典与索引，许可证按机器码或账号绑定。这套做法准确，但部署重、迁移麻烦、离线环境不好用。
 
-| 环节 | 旧版 | 本版 |
+本版走的是另一条路：标准库 HTTP 服务 + 纯 Python 解析 + 字符 n-gram 召回，全部离线，解压即用。
+
+| 环节 | 某商业产品常见做法 | 本版 |
 |---|---|---|
-| 解析 | POI / PDFBox | mammoth（docx→HTML）、OLE+FIB（doc）、pypdf |
-| 索引 | 每份文档一个 RAMDirectory | 全局字符 3-gram 倒排表，内存降一个量级 |
-| 召回 | QueryParser + IKAnalyzer 分词 | n-gram 命中率过滤，不依赖词典 |
-| 相似度 | 0.4×编辑距离 + 0.6×词长 Dice，阈值 0.8 | 同公式，阈值 0.6（实测更贴人工判断） |
-| 输出 | FreeMarker 模板 | 内置报告页 + 独立 HTML 导出 |
-| 授权 | 机器码 + 联网激活 | 无 |
+| 解析 | 重型 Java 解析库（POI 一类） | mammoth（docx→HTML）、OLE+FIB（doc）、pypdf |
+| 索引 | 每份文档独立建索引 | 全局字符 3-gram 倒排表，内存占用低一个量级 |
+| 召回 | 分词器 + 查询解析 | n-gram 命中率过滤，不依赖词典、不怕专业术语 |
+| 相似度 | 阈值偏严，误报少漏报多 | 0.4×编辑距离 + 0.6×Dice，阈值 0.6（实测更贴人工判断） |
+| 输出 | 模板引擎出报告 | 内置报告页 + 独立 HTML 导出 |
+| 授权 | 机器码 / 联网激活 | 无，纯本地，拷走即用 |
 
 ## 已知限制
 

@@ -19,7 +19,7 @@ Windows 版已可用（159MB 便携包，免安装）。现在要做 macOS 版�
 ## 2. 目录结构
 
 ```
-tocheck-next/
+Prismatch/
 ├── app/
 │   ├── text.py        归一化、分句、token、gram 哈希、simhash
 │   ├── extract.py     docx/doc/pdf/pptx/xlsx → 段落块
