@@ -38,7 +38,7 @@ docs/
 # 界面截图（README 引用的保留在 mockups/png 下）
 mockups/*.html
 mockups/png/*.png
-!mockups/png/layout-apple.png
+!mockups/png/ui-main.png
 
 # 其它
 *.log

@@ -5,7 +5,7 @@
 
 Windows 单机版，免安装、不联网、不上传任何文档：解析、比对、出报告全部在本机完成。
 
-![界面](mockups/png/layout-apple.png)
+![界面](mockups/png/ui-main.png)
 
 ## 它做什么
 
