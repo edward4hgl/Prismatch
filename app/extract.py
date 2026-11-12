@@ -266,8 +266,24 @@ def docx_to_html(data: bytes) -> str:
     return result.value
 
 
-def extract(filename: str, data: bytes):
-    kind = kind_of(filename)
+def pdf_needs_ocr(data: bytes, blocks):
+    """A PDF whose extracted text is far too thin for its page count is a scan."""
+    pages = 0
+    try:
+        from pypdf import PdfReader
+
+        pages = len(PdfReader(io.BytesIO(data)).pages)
+    except Exception:
+        pages = blocks[-1].page if blocks else 0
+    total = sum(len(b.text.strip()) for b in blocks)
+    if pages <= 0:
+        return False, 0
+    return total < max(120, pages * 24), pages
+
+
+def extract(filename: str, data: bytes, force_kind=None, min_chars: int = 20,
+            allow_empty: bool = False):
+    kind = force_kind or kind_of(filename)
     renamed = False
 
     # sniff real container type instead of trusting the extension
@@ -300,12 +316,14 @@ def extract(filename: str, data: bytes):
     blocks = cleaned
 
     if not blocks:
+        if allow_empty:
+            return kind, []
         if kind == "doc":
             if renamed:
                 raise ValueError("文件不是有效的 .docx（可能是旧版 .doc 或已损坏），请另存为 .docx 后重试")
             raise ValueError("旧版 .doc 无法解析，请另存为 .docx 后重试")
         raise ValueError("没有提取到文本（可能是扫描件或加密文件）")
-    if sum(len(b.text.strip()) for b in blocks) < 20:
+    if sum(len(b.text.strip()) for b in blocks) < min_chars:
         raise ValueError("提取到的文本过少（可能是扫描件）")
     return kind, blocks
 

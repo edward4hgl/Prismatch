@@ -3,12 +3,16 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('app', 'app'), ('vendor', 'vendor')]
 binaries = []
-hiddenimports = ['clr']
+hiddenimports = ['clr', 'win32com', 'win32com.client', 'pythoncom', 'pywintypes', 'pymupdf']
 tmp_ret = collect_all('webview')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('clr_loader')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('pythonnet')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('win32com')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('pymupdf')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

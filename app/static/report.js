@@ -475,6 +475,12 @@
         <td class="act"><b>${(p.score * 100).toFixed(1)}%</b></td>
       </tr>`).join("") || `<tr class="empty"><td colspan="7">没有超过阈值的相似内容</td></tr>`;
 
+    const notes = (r.docs || []).filter((d) => d && d.note);
+    const noteBlock = notes.length ? `<div class="card">
+      <h3 class="h3">文本来源说明</h3>
+      ${notes.map((d) => `<div class="note small">· <b>${esc(d.name)}</b>：${esc(d.note)}</div>`).join("")}
+    </div>` : "";
+
     const errs = r.errors || [];
     const errBlock = errs.length ? `<div class="card" style="border-color:rgba(255,91,127,.35)">
       <h3 class="h3">解析失败的文档（已跳过，未参与比对）</h3>
@@ -483,6 +489,7 @@
 
     return `
     ${errBlock}
+    ${noteBlock}
     <div class="sumgrid">
       <div class="sumcard"><div class="k">送检文档</div><div class="v">${s.docs} 份</div></div>
       <div class="sumcard"><div class="k">最大相似句子</div><div class="v hot">${s.max_sentences}</div></div>

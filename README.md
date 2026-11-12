@@ -14,19 +14,22 @@ Windows 单机版，免安装、不联网、不上传任何文档：解析、比
 - **招标白名单**：导入招标文件，与其相同的段落先剔除，不参与检测，避免把「官方措辞」当成抄袭
 - **三种视图**：相似句子 / 相似段落 / 相似图片，双栏对照、点击跳转、上一句/下一句
 - **报告**：百分比、按页输出、打印（句子 / 段落 / 全文三种版式）、导出独立 HTML、历史报告持久化
-- **保留排版**：docx 转 HTML 后原样呈现（表格、加粗、标题层级都可读），不是把文字拍平成纯文本
+- **保留排版**：docx 转 HTML 后原样呈现（表格、加粗、标题层级都可读），不是把文字拍平成纯文本；旧版 `.doc` 与扫描件也能进同一套视图
+- **扫描件 OCR**：没有文本层的 PDF 自动走 Windows 自带 OCR，逐页识别后参与比对
 
 ## 支持格式
 
 | 类型 | 解析方式 |
 |---|---|
 | `.docx` | mammoth → HTML（保留表格 / 标题 / 加粗），正文另行抽取用于比对 |
-| `.doc` | OLE 复合文档 + FIB / Clx 分片表还原正文（不依赖 Word） |
-| `.pdf` | pypdf 文本层（扫描件无文本层，会记入「解析失败」） |
+| `.doc` | 装了 Word 时先转 `.docx` 再走上面的路径（排版一并保留，转换结果按内容哈希缓存）；没有 Word 时回退 OLE 复合文档 + FIB / Clx 分片表取纯文本 |
+| `.pdf` | pypdf 文本层；检测到无文本层（扫描件）则用 Windows.Media.Ocr 逐页 OCR，默认最多 40 页，其余页跳过并在报告注明「已识别前 N / 共 M 页」 |
 | `.pptx` / `.ppt` | python-pptx 取文本与备注 |
 | `.xlsx` | openpyxl 取单元格文本 |
 | `.txt` | 直接读取，自动探测编码 |
 | 图片 | dHash 感知哈希，汉明距离 ≤6 判为同图 |
+
+> `.doc` 排版还原需要本机装 Word（Office）；OCR 需要系统里存在 Windows OCR 语言包（中文简体通常已自带）。两者缺失时自动降级，不会让整个任务失败。
 
 ## 相似度算法
 
@@ -86,6 +89,9 @@ app/
   server.py      本地 HTTP 服务（标准库 ThreadingHTTPServer）
   engine.py      解析调度、分组、比对、进度与 ETA
   extract.py     docx/doc/pdf/pptx/xlsx/txt/图片 抽取
+  wordconv.py    旧版 .doc → docx（调用本机 Word，带哈希缓存）
+  ocr.py         扫描件 PDF 渲染 + 调 Windows OCR 并重组行
+  ocr_win.ps1    WinRT OCR 桥（Windows PowerShell 5.1）
   text.py        归一化、分句、分词、3-gram、simhash
   report.py      独立 HTML 报告导出
   static/        前端（原生 JS，无框架、无构建）
@@ -103,7 +109,7 @@ vendor/          运行时用到的纯 Python 依赖
 
 | 环节 | 某商业产品常见做法 | 本版 |
 |---|---|---|
-| 解析 | 重型 Java 解析库（POI 一类） | mammoth（docx→HTML）、OLE+FIB（doc）、pypdf |
+| 解析 | 重型 Java 解析库（POI 一类） | mammoth（docx→HTML）、Word 转 docx（doc）、pypdf / OCR（pdf） |
 | 索引 | 每份文档独立建索引 | 全局字符 3-gram 倒排表，内存占用低一个量级 |
 | 召回 | 分词器 + 查询解析 | n-gram 命中率过滤，不依赖词典、不怕专业术语 |
 | 相似度 | 阈值偏严，误报少漏报多 | 0.4×编辑距离 + 0.6×Dice，阈值 0.6（实测更贴人工判断） |
@@ -112,10 +118,10 @@ vendor/          运行时用到的纯 Python 依赖
 
 ## 已知限制
 
-- 扫描版 PDF 没有文本层，无法比对（会在报告里单独列出）
-- `.doc` 旧格式里的文本框、艺术字可能丢字
-- 图片比对只看感知哈希，不做 OCR
-- 报告里的排版还原依赖 `.docx` 原始样式；`.doc` / `.pdf` 只能给纯文本
+- 扫描版 PDF 的 OCR 默认只跑前 40 页（`options.ocr_max_pages` 可调），超出部分在报告里注明已识别的页数范围；封面、印章页识别质量取决于扫描清晰度
+- `.doc` 的排版还原依赖本机 Word；没装 Word 时只能拿到纯文本，文本框、艺术字可能丢字
+- 图片比对只看感知哈希，不做图片里的文字识别
+- 报告里的排版还原依赖 `.docx` / 转换后的原始样式；PDF 与 OCR 结果是按行重组的文本，没有版式
 
 ## 说明
 

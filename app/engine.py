@@ -8,7 +8,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
-from . import extract, rules, sim, text as T
+from . import extract, ocr as ocr_mod, rules, sim, text as T, wordconv
 
 MAX_BLOCK_TEXT = 6000
 MAX_BLOCKS_PER_PAIR = 400
@@ -58,11 +58,12 @@ class Doc:
     path: str = ""
     html: str = ""
     raw: str = ""
+    note: str = ""
 
 
-def build_doc(idx, name, data, options, group=None, tender=None, path=""):
+def build_doc(idx, name, data, options, group=None, tender=None, path="", force_kind=""):
     try:
-        return _build_doc(idx, name, data, options, group, tender, path)
+        return _build_doc(idx, name, data, options, group, tender, path, force_kind)
     except Exception as exc:  # noqa: BLE001
         doc = Doc(id=idx, name=name, chars=0, paras=[], segs=[],
                   kind=extract.kind_of(name), group=group, path=path)
@@ -70,12 +71,38 @@ def build_doc(idx, name, data, options, group=None, tender=None, path=""):
         return doc
 
 
-def _build_doc(idx, name, data, options, group=None, tender=None, path=""):
+def _build_doc(idx, name, data, options, group=None, tender=None, path="", force_kind=""):
     if isinstance(data, str):          # path: load lazily, drop after parsing
         path = path or data
         with open(data, "rb") as fh:
             data = fh.read()
-    kind, blocks = extract.extract(name, data)
+    source_kind = extract.kind_of(name)
+    note = ""
+    if source_kind == "pdf":
+        kind, blocks = extract.extract(name, data, min_chars=0, allow_empty=True)
+        if options.get("ocr", True):
+            need, pages = extract.pdf_needs_ocr(data, blocks)
+            if need:
+                limit = int(options.get("ocr_max_pages", 40) or 0)
+                done = options.get("_ocr_progress")
+                b2, meta = ocr_mod.ocr_pdf(
+                    data, max_pages=limit, progress=done, cancel=options.get("_cancel")
+                )
+                if b2:
+                    blocks = [extract.Block(p, t) for p, t in b2]
+                    span = meta["pages_done"]
+                    if meta.get("truncated"):
+                        note = "扫描件 OCR：已识别前 %d / %d 页" % (span, meta["pages_total"])
+                    else:
+                        note = "扫描件 OCR：全 %d 页" % span
+                elif meta.get("error"):
+                    note = "扫描件 OCR 失败（%s）" % meta["error"]
+                elif pages:
+                    note = "扫描件（未识别出文字）"
+    else:
+        kind, blocks = extract.extract(name, data, force_kind=force_kind or None)
+        if force_kind and force_kind != source_kind:
+            note = "旧版 .doc 已按 Word 排版转换"
     paras, segs = [], []
     for block in blocks:
         is_table = str(getattr(block, "kind", "para")) == "table"
@@ -103,9 +130,13 @@ def _build_doc(idx, name, data, options, group=None, tender=None, path=""):
         for g in seg.grams:
             index[g].append(sid)
 
+    if not paras and source_kind == "pdf":
+        raise ValueError(note or "PDF 中没有可识别的文字")
+
     chars = sum(len(p.text) for p in paras if p.ptype == 0 and not p.filtered)
     doc = Doc(id=idx, name=name, chars=chars, paras=paras, segs=segs,
               index=dict(index), kind=kind, group=group, path=path)
+    doc.note = note
     doc.filtered_paras = sum(1 for p in paras if p.filtered)
     if options.get("images", True):
         raw = extract.images_of(name, data)
@@ -297,6 +328,7 @@ def _save_img(image_dir, doc_id, idx, item, cache):
 
 def analyze(files, tender_files=None, options=None, progress=None, cancel=None):
     options = options or {}
+    files = list(files)
     t0 = time.time()
     docs = []
 
@@ -374,13 +406,36 @@ def analyze(files, tender_files=None, options=None, progress=None, cancel=None):
         return rem
 
     report("extract", 0, len(files), None)
+
+    # ---- legacy .doc: one Word instance converts the whole batch up front ----
+    options["_cancel"] = cancel
+    forced = {}
+    if options.get("word_convert", True):
+        pending = [
+            (i, item[1])
+            for i, item in enumerate(files)
+            if extract.kind_of(item[0]) == "doc"
+        ]
+        if pending and wordconv.available():
+            converted = wordconv.convert_batch(
+                pending,
+                cache_dir=options.get("conv_dir", ""),
+                cancel=cancel,
+            )
+            for i, blob in converted.items():
+                if blob:
+                    item = files[i]
+                    files[i] = (item[0], blob, item[2]) + tuple(item[3:])
+                    forced[i] = "docx"
+
     for i, item in enumerate(files):
         name, data, group = item[0], item[1], item[2]
         src = item[3] if len(item) > 3 else ""
         if cancel is not None and cancel.is_set():
             raise Cancelled()
         t_file = time.time()
-        docs.append(build_doc(i, name, data, options, group, tender, src))
+        docs.append(build_doc(i, name, data, options, group, tender, src,
+                              force_kind=forced.get(i, "")))
         dt = time.time() - t_file
         kind, sz = sizes[i]
         obs.append((sz, dt))
@@ -506,7 +561,7 @@ def analyze(files, tender_files=None, options=None, progress=None, cancel=None):
             {"id": d.id, "name": d.name, "chars": d.chars, "paras": len(d.paras),
              "indexed": len(d.segs), "images": len(d.images), "kind": d.kind,
              "group": d.group, "filtered": d.filtered_paras, "error": d.error,
-             "path": d.path, "html": d.html, "raw": d.raw,
+             "path": d.path, "html": d.html, "raw": d.raw, "note": d.note,
              "blocks": [{"i": p.idx, "pg": p.page, "t": p.text[:MAX_BLOCK_TEXT]}
                         for p in d.paras if p.ptype == 0 and not p.filtered],
              "all": [{"i": p.idx, "pg": p.page, "t": p.text[:MAX_BLOCK_TEXT],

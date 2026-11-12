@@ -329,6 +329,7 @@ def run_job(job_id, files, tender, options):
         opts["image_dir"] = os.path.join(IMG_DIR, job_id)
         opts["html_dir"] = os.path.join(DOC_DIR, job_id)
         opts["raw_dir"] = opts["html_dir"]
+        opts.setdefault("conv_dir", os.path.join(APP_ROOT, "data", "conv"))
         try:
             os.makedirs(opts["html_dir"], exist_ok=True)
         except Exception:
@@ -340,6 +341,9 @@ def run_job(job_id, files, tender, options):
         _save_report(job_id, result, files)
 
         st = result["stats"]
+        for d in result["docs"]:
+            if d.get("note"):
+                _log(job, f"  {d['name']}：{d['note']}")
         _log(job, f"完成：文档 {st['docs']} 份，字数 {st['chars']}，相似文件对 {st['pairs']}，"
                   f"最高 {st['max_score'] * 100:.1f}%，剔除 {st['filtered']} 段，用时 {st['elapsed']}s")
         for e in result.get("errors", []):

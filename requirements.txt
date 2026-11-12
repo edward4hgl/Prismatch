@@ -6,6 +6,10 @@ python-pptx>=0.6.23
 openpyxl>=3.1.2
 Pillow>=10.0.0
 pywebview>=5.0
+# 扫描件 PDF OCR（渲染页面用）
+pymupdf>=1.24.0
+# 旧版 .doc → docx（Windows；需本机装 Word，缺失时自动降级为纯文本）
+pywin32>=306; sys_platform == "win32"
 
 # 打包（可选）
 # pyinstaller>=6.0

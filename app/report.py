@@ -107,6 +107,11 @@ def render_report(result) -> str:
         err_html = ("<h2>解析失败的文档（已跳过）</h2>" + "".join(
             f'<div class="sub">✕ {_e(e["name"])}：{_e(e["error"])}</div>' for e in errs))
 
+    notes = [d for d in (result.get("docs") or []) if d.get("note")]
+    if notes:
+        err_html += ("<h2>文本来源说明</h2>" + "".join(
+            f'<div class="sub">· <b>{_e(d["name"])}</b>：{_e(d["note"])}</div>' for d in notes))
+
     gp = result.get("groupPairs") or []
     gp_html = ""
     if gp:
