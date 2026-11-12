@@ -123,8 +123,13 @@
 
   <!-- ============ 报告列表 ============ -->
   <section id="page-reports" class="page hidden">
-    <h2 class="h2">标书报告</h2>
-    <p class="note small" style="margin-top:-8px">按最高重复率从高到低排序</p>
+    <div class="rep-head">
+      <div>
+        <h2 class="h2">标书报告</h2>
+        <p class="note small" style="margin-top:-8px">按最高重复率从高到低排序</p>
+      </div>
+      <span class="clean-slot" id="cleanSlotTop"></span>
+    </div>
     <div id="reportList" class="report-list"></div>
   </section>
 
@@ -155,6 +160,20 @@
 <input id="tenderInput" type="file" multiple hidden accept=".docx,.doc,.pdf,.pptx,.ppt,.xlsx,.txt">
 <div id="toast" class="toast"></div>
 <div class="credit" title="Developed by edward4hgl with DSH">Developed by <b>edward4hgl</b> with DSH</div>
+<div class="ver-tag" id="verTag">v1.1</div>
+
+<div id="cleanDlg" class="modal hidden">
+  <div class="modal-card clean-card">
+    <h3>清理缓存</h3>
+    <p class="note small clean-sub">勾选要清理的内容；删掉不影响报告打开，下次需要会自动重建。</p>
+    <div class="cache-list" id="cacheList"><div class="cache-loading">正在统计…</div></div>
+    <div class="cache-total"><span>将释放</span><b id="cacheFree">—</b></div>
+    <div class="opts row">
+      <button id="cleanCancel">取消</button>
+      <button id="cleanGo" class="primary">清理</button>
+    </div>
+  </div>
+</div>
 
 <aside id="logDrawer" class="drawer hidden">
   <div class="drawer-head">

@@ -26,6 +26,7 @@ else:
     APP_ROOT = os.path.dirname(ROOT)
 
 STATIC = os.path.join(ROOT, "static")
+APP_VERSION = "1.1"
 LOG_DIR = os.path.join(APP_ROOT, "logs")
 IMG_DIR = os.path.join(APP_ROOT, "data", "images")
 REPORT_DIR = os.path.join(APP_ROOT, "data", "reports")
@@ -276,6 +277,151 @@ def _reap_uploads():
             if now - ts > UPLOAD_TTL:
                 UPLOADS.pop(uid, None)
 
+
+# ---------------- 缓存清理 ----------------
+
+CONV_DIR = os.path.join(APP_ROOT, "data", "conv")
+
+
+def _dir_size(path):
+    total = 0
+    count = 0
+    if not os.path.isdir(path):
+        return 0, 0
+    for root, _dirs, files in os.walk(path):
+        for fn in files:
+            try:
+                total += os.path.getsize(os.path.join(root, fn))
+                count += 1
+            except OSError:
+                pass
+    return total, count
+
+
+def _report_ids():
+    ids = set()
+    try:
+        for fn in os.listdir(REPORT_DIR):
+            if fn.endswith(".meta.json"):
+                ids.add(fn[: -len(".meta.json")])
+    except OSError:
+        pass
+    return ids
+
+
+def _orphan_dirs(base, keep):
+    out = []
+    try:
+        for name in os.listdir(base):
+            full = os.path.join(base, name)
+            if os.path.isdir(full) and name not in keep:
+                out.append((name, full))
+    except OSError:
+        pass
+    return out
+
+
+def _report_bytes(rid):
+    total = 0
+    for suffix in (".meta.json", ".json.gz", ".txt"):
+        try:
+            total += os.path.getsize(os.path.join(REPORT_DIR, rid + suffix))
+        except OSError:
+            pass
+    for base in (DOC_DIR, IMG_DIR):
+        total += _dir_size(os.path.join(base, rid))[0]
+    return total
+
+
+def _cache_stats(days=30):
+    keep = _report_ids()
+    docs_bytes, docs_files = _dir_size(DOC_DIR)
+    img_bytes, img_files = _dir_size(IMG_DIR)
+    conv_bytes, conv_files = _dir_size(CONV_DIR)
+    rep_bytes, rep_files = _dir_size(REPORT_DIR)
+    docs_dirs = len(_orphan_dirs(DOC_DIR, set())) if os.path.isdir(DOC_DIR) else 0
+    img_dirs = len(_orphan_dirs(IMG_DIR, set())) if os.path.isdir(IMG_DIR) else 0
+
+    cutoff = time.time() - days * 86400
+    old_ids = []
+    for rid in keep:
+        try:
+            if os.path.getmtime(os.path.join(REPORT_DIR, rid + ".meta.json")) < cutoff:
+                old_ids.append(rid)
+        except OSError:
+            pass
+    old_bytes = sum(_report_bytes(rid) for rid in old_ids)
+
+    return {
+        "ok": True,
+        "items": [
+            {"key": "docs", "label": "排版快照", "bytes": docs_bytes, "files": docs_files,
+             "dirs": docs_dirs, "note": "报告里的原样排版，删了仍能打开"},
+            {"key": "images", "label": "图片缩略图", "bytes": img_bytes, "files": img_files,
+             "dirs": img_dirs, "note": "报告里的相似图片预览"},
+            {"key": "conv", "label": "Word 转换缓存", "bytes": conv_bytes, "files": conv_files,
+             "dirs": 0, "note": "旧版 .doc 转 docx 的中间结果"},
+            {"key": "reports", "label": "历史报告", "bytes": rep_bytes, "files": rep_files,
+             "dirs": 0, "note": "报告本身就保留着，只清 30 天前的"},
+        ],
+        "old_reports": {"days": days, "count": len(old_ids), "bytes": old_bytes},
+        "total": docs_bytes + img_bytes + conv_bytes + rep_bytes,
+    }
+
+
+def _clear_dir(base):
+    """删掉目录下的所有内容，保留目录本身。返回释放字节数。"""
+    import shutil
+
+    freed = 0
+    if not os.path.isdir(base):
+        return 0
+    for name in os.listdir(base):
+        full = os.path.join(base, name)
+        try:
+            if os.path.isdir(full):
+                freed += _dir_size(full)[0]
+                shutil.rmtree(full, ignore_errors=True)
+            else:
+                freed += os.path.getsize(full)
+                os.remove(full)
+        except OSError:
+            pass
+    return freed
+
+
+def _cache_clear(keys=None, days=30):
+    if any(j.get("state") == "running" for j in JOBS.values()):
+        return {"ok": False, "error": "有检测任务正在运行，请先等它结束"}
+    keys = set(keys or [])
+    freed = 0
+    if "docs" in keys:
+        freed += _clear_dir(DOC_DIR)
+    if "images" in keys:
+        freed += _clear_dir(IMG_DIR)
+    if "conv" in keys:
+        freed += _clear_dir(CONV_DIR)
+    if "reports" in keys:
+        cutoff = time.time() - days * 86400
+        for rid in list(_report_ids()):
+            meta = os.path.join(REPORT_DIR, rid + ".meta.json")
+            try:
+                if os.path.getmtime(meta) >= cutoff:
+                    continue
+            except OSError:
+                continue
+            freed += _report_bytes(rid)
+            for suffix in (".meta.json", ".json.gz", ".txt"):
+                try:
+                    os.remove(os.path.join(REPORT_DIR, rid + suffix))
+                except OSError:
+                    pass
+            import shutil
+
+            for base in (DOC_DIR, IMG_DIR):
+                shutil.rmtree(os.path.join(base, rid), ignore_errors=True)
+    return {"ok": True, "freed": freed}
+
 MIME = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
@@ -298,11 +444,12 @@ def run_job(job_id, files, tender, options):
     job["id"] = job_id
     last = {"stage": None, "decile": -1}
 
-    def progress(stage, done, total, eta=None):
+    def progress(stage, done, total, eta=None, sub=None):
         job["stage"] = stage
         job["done"] = done
         job["total"] = total
         job["eta"] = eta
+        job["sub"] = sub
         job["percent"] = int(done * 100 / total) if total else 0
         if stage != last["stage"]:
             last["stage"] = stage
@@ -441,6 +588,7 @@ class Handler(BaseHTTPRequestHandler):
                 "total": job.get("total", 0),
                 "percent": job.get("percent", 0),
                 "eta": job.get("eta"),
+                "sub": job.get("sub"),
                 "error": job.get("error"),
             }
             if job["state"] == "done":
@@ -576,7 +724,10 @@ class Handler(BaseHTTPRequestHandler):
             STARTUP.clear()
             return
         if p == "/api/health":
-            self._json({"ok": True, "jobs": len(JOBS)})
+            self._json({"ok": True, "jobs": len(JOBS), "version": APP_VERSION})
+            return
+        if p == "/api/cache":
+            self._json(_cache_stats())
             return
         self._send(404, b"not found", "text/plain; charset=utf-8")
 
@@ -625,6 +776,18 @@ class Handler(BaseHTTPRequestHandler):
                 ev.set()
             _log(job, "收到停止请求", "warn")
             self._json({"ok": True})
+            return
+        if u.path == "/api/cache/clear":
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8-sig")) if length else {}
+            except Exception:
+                payload = {}
+            keys = payload.get("keys")
+            if not isinstance(keys, list):
+                keys = ["docs", "images", "conv"]
+            res = _cache_clear(keys=[str(k) for k in keys], days=int(payload.get("days") or 30))
+            self._json(res, 200 if res.get("ok") else 409)
             return
         if u.path == "/api/open":
             length = int(self.headers.get("Content-Length") or 0)

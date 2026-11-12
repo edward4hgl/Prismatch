@@ -1008,7 +1008,7 @@ function poll() {
         return;
       }
       if (j.state === "error") throw new Error(j.error || "分析失败");
-      const sub = j.stage === "extract" ? `已解析 ${j.done}/${j.total} 份` : `已完成 ${j.done}/${j.total} 对`;
+      const sub = j.sub || (j.stage === "extract" ? `已解析 ${j.done}/${j.total} 份` : `已完成 ${j.done}/${j.total} 对`);
       if (j.eta != null) {
         const raw = Number(j.eta);
         const prev = etaState.v == null
@@ -1126,6 +1126,123 @@ function toast(msg) {
 
 renderTables();
 loadReports();
+
+/* ---------------- 版本号 + 清理缓存 ---------------- */
+function fmtSize(n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB";
+  if (n < 1073741824) return (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
+  return (n / 1073741824).toFixed(2) + " GB";
+}
+
+fetch("/api/health").then((r) => r.json()).then((j) => {
+  if (j && j.version) $("verTag").textContent = "v" + j.version;
+}).catch(() => {});
+
+(function mountCleanBtn() {
+  const slot = $("cleanSlotTop");
+  if (!slot) return;
+  const btn = document.createElement("button");
+  btn.className = "clean-btn";
+  btn.id = "cleanBtn";
+  btn.textContent = "清理缓存";
+  btn.title = "清理本机的排版快照、图片缩略图等中间文件";
+  btn.onclick = openCleanDlg;
+  slot.appendChild(btn);
+})();
+
+let cacheState = null;
+const DEFAULT_KEYS = ["docs", "images", "conv"];
+
+function cacheRow(item) {
+  const key = item.key;
+  const disabled = key === "reports" && !(cacheState.old_reports || {}).count;
+  const checked = !disabled && DEFAULT_KEYS.indexOf(key) >= 0 ? " checked" : "";
+  const zero = !item.bytes ? " zero" : "";
+  let meta = `${item.files} 个文件`;
+  if (key === "reports") {
+    const old = cacheState.old_reports || { count: 0, days: 30 };
+    meta = old.count ? `30 天前的 ${old.count} 份报告` : "没有 30 天前的报告";
+  }
+  return `<label class="cache-row${zero}${disabled ? " disabled" : ""}">
+    <input type="checkbox" class="cache-chk" data-key="${key}"${checked}${disabled ? " disabled" : ""}>
+    <span class="cbox"><span class="cname">${esc(item.label)}</span><i class="cnote">${esc(item.note || "")}</i></span>
+    <span class="cmeta">${meta}</span>
+    <span class="csize">${fmtSize(item.bytes)}</span>
+  </label>`;
+}
+
+function checkedKeys() {
+  return [...document.querySelectorAll(".cache-chk")]
+    .filter((el) => el.checked && !el.disabled)
+    .map((el) => el.dataset.key);
+}
+
+function paintCache(j) {
+  cacheState = j;
+  $("cacheList").innerHTML = (j.items || []).map(cacheRow).join("");
+  document.querySelectorAll(".cache-chk").forEach((el) => {
+    el.onchange = paintFree;
+  });
+  paintFree();
+}
+
+function paintFree() {
+  if (!cacheState) return;
+  const keys = checkedKeys();
+  let free = 0;
+  (cacheState.items || []).forEach((it) => {
+    if (keys.indexOf(it.key) < 0) return;
+    if (it.key === "reports") free += (cacheState.old_reports || {}).bytes || 0;
+    else free += it.bytes || 0;
+  });
+  $("cacheFree").textContent = fmtSize(free);
+  $("cleanGo").textContent = free ? `清理 ${fmtSize(free)}` : "无需清理";
+  $("cleanGo").disabled = !free;
+}
+
+function openCleanDlg() {
+  $("cleanDlg").classList.remove("hidden");
+  $("cacheList").innerHTML = '<div class="cache-loading">正在统计…</div>';
+  $("cacheFree").textContent = "—";
+  fetch("/api/cache").then((r) => r.json()).then(paintCache).catch(() => {
+    $("cacheList").innerHTML = '<div class="cache-loading">统计失败，请稍后再试</div>';
+  });
+}
+
+$("cleanCancel").onclick = () => $("cleanDlg").classList.add("hidden");
+$("cleanDlg").onclick = (e) => {
+  if (e.target === $("cleanDlg")) $("cleanDlg").classList.add("hidden");
+};
+$("cleanGo").onclick = async () => {
+  const keys = checkedKeys();
+  if (!keys.length) return;
+  const btn = $("cleanGo");
+  btn.disabled = true;
+  btn.textContent = "清理中…";
+  try {
+    const r = await fetch("/api/cache/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys, days: 30 }),
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      toast(j.error || "清理失败");
+      btn.disabled = false;
+      paintFree();
+      return;
+    }
+    $("cleanDlg").classList.add("hidden");
+    toast(j.freed ? `已清理，释放 ${fmtSize(j.freed)}` : "没有可清理的内容");
+    fetch("/api/cache").then((x) => x.json()).then(paintCache).catch(() => {});
+  } catch (e) {
+    toast("清理失败：" + (e.message || e));
+    btn.disabled = false;
+    paintFree();
+  }
+};
 
 // 自检：?selftest=1 时模拟点击皮肤菜单，结果写入 document.title
 if (new URLSearchParams(location.search).get("selftest") === "1") {

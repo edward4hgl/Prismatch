@@ -20,6 +20,38 @@ class Cancelled(Exception):
     """Raised when the caller stops a running analysis."""
 
 
+# 单页文本低于这个字数就当作"这一页是扫描图"
+OCR_PAGE_MIN = 60
+
+
+def _pages_label(nums, limit=8):
+    """1-5, 8, 12-14 — keeps the note readable on a 900-page scan."""
+    nums = sorted(nums)
+    spans = []
+    for n in nums:
+        if spans and n == spans[-1][1] + 1:
+            spans[-1][1] = n
+        else:
+            spans.append([n, n])
+    labels = [str(a) if a == b else "%d-%d" % (a, b) for a, b in spans]
+    if len(labels) > limit:
+        labels = labels[:limit] + ["…"]
+    return ", ".join(labels)
+
+
+def _ocr_note(meta, asked):
+    total = meta.get("pages_total") or 0
+    done = meta.get("pages_done") or 0
+    if total and done >= total:
+        return "扫描件：全 %d 页已 OCR" % total
+    head = "扫描件：第 %s 页已 OCR" % _pages_label(asked[:done] if done else asked)
+    if total:
+        head += "（共 %d 页）" % total
+    if meta.get("truncated"):
+        head += "，其余未识别"
+    return head
+
+
 @dataclass
 class Seg:
     para: int
@@ -81,24 +113,31 @@ def _build_doc(idx, name, data, options, group=None, tender=None, path="", force
     if source_kind == "pdf":
         kind, blocks = extract.extract(name, data, min_chars=0, allow_empty=True)
         if options.get("ocr", True):
-            need, pages = extract.pdf_needs_ocr(data, blocks)
-            if need:
-                limit = int(options.get("ocr_max_pages", 40) or 0)
-                done = options.get("_ocr_progress")
-                b2, meta = ocr_mod.ocr_pdf(
-                    data, max_pages=limit, progress=done, cancel=options.get("_cancel")
-                )
-                if b2:
-                    blocks = [extract.Block(p, t) for p, t in b2]
-                    span = meta["pages_done"]
-                    if meta.get("truncated"):
-                        note = "扫描件 OCR：已识别前 %d / %d 页" % (span, meta["pages_total"])
+            total = ocr_mod.page_count(data)
+            if total:
+                # 每页单独判断：有文本层的页直接用文本，只把"空白页"送去 OCR
+                page_chars = {}
+                for b in blocks:
+                    key = int(b.page)
+                    page_chars[key] = page_chars.get(key, 0) + len((b.text or "").strip())
+                have = {p for p, chars in page_chars.items() if chars >= OCR_PAGE_MIN}
+                missing = [i for i in range(1, total + 1) if i not in have]
+                if missing:
+                    b2, meta = ocr_mod.ocr_pdf(
+                        data,
+                        pages=missing,
+                        max_pages=int(options.get("ocr_max_pages", 0) or 0),
+                        progress=options.get("_ocr_progress"),
+                        cancel=options.get("_cancel"),
+                    )
+                    if b2:
+                        blocks = sorted(list(blocks) + [extract.Block(p, t) for p, t in b2],
+                                        key=lambda b: b.page)
+                        note = _ocr_note(meta, missing)
+                    elif meta.get("error") and meta.get("error") != "cancelled":
+                        note = "扫描页 OCR 失败（%s）" % meta["error"]
                     else:
-                        note = "扫描件 OCR：全 %d 页" % span
-                elif meta.get("error"):
-                    note = "扫描件 OCR 失败（%s）" % meta["error"]
-                elif pages:
-                    note = "扫描件（未识别出文字）"
+                        note = "扫描页未识别出文字（%d 页）" % len(missing)
     else:
         kind, blocks = extract.extract(name, data, force_kind=force_kind or None)
         if force_kind and force_kind != source_kind:
@@ -332,12 +371,15 @@ def analyze(files, tender_files=None, options=None, progress=None, cancel=None):
     t0 = time.time()
     docs = []
 
-    def report(stage, done, total, eta=None):
+    def report(stage, done, total, eta=None, sub=None):
         if progress:
             try:
-                progress(stage, done, total, eta)
+                progress(stage, done, total, eta, sub)
             except TypeError:
-                progress(stage, done, total)
+                try:
+                    progress(stage, done, total, eta)
+                except TypeError:
+                    progress(stage, done, total)
 
     tender = TenderFilter(tender_files, options) if tender_files else None
 
@@ -434,6 +476,10 @@ def analyze(files, tender_files=None, options=None, progress=None, cancel=None):
         if cancel is not None and cancel.is_set():
             raise Cancelled()
         t_file = time.time()
+        options["_ocr_progress"] = (
+            lambda d, t, _i=i: report("extract", _i, len(files), extract_eta(),
+                                      "扫描页 OCR %d/%d" % (d, t))
+        )
         docs.append(build_doc(i, name, data, options, group, tender, src,
                               force_kind=forced.get(i, "")))
         dt = time.time() - t_file

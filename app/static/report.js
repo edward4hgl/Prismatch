@@ -718,7 +718,7 @@
         ? list.map((b) => `<div class="para" data-para="${b.i}">${hl(b.t, sp[b.i])}</div>`).join("")
         : `<span class="dim">没有相似内容</span>`;
       const body = (doc.raw || doc.html)
-        ? `<div class="rich" data-side="${side}" data-raw="${esc(doc.raw || "")}" data-html="${esc(doc.html || "")}">正在加载原文…</div>`
+        ? `<div class="rich" data-side="${side}" data-raw="${esc(doc.raw || "")}" data-html="${esc(doc.html || "")}">正在加载原文…</div><div class="plain-fallback hidden">${plain}</div>`
         : `<div class="rich-note">该文档没有原样排版数据（${
             doc.kind === "docx" ? "旧记录" : doc.kind.toUpperCase()
           }），以下为文字版</div>${plain}`;
@@ -812,6 +812,23 @@
   }
 
   /* ---------------- rich (docx HTML) rendering ---------------- */
+  function missingNote(e) {
+    const msg = String((e && e.message) || e || "");
+    if (/\b404\b/.test(msg)) {
+      return "该文档的排版快照已被清理（重新检测会自动重建），这里只显示文字对照。";
+    }
+    return "原文加载失败：" + msg;
+  }
+
+  function fallbackToPlain(el, e) {
+    const fb = el.nextElementSibling;
+    if (!fb || !fb.classList.contains("plain-fallback")) return false;
+    el.classList.add("hidden");
+    fb.classList.remove("hidden");
+    fb.insertAdjacentHTML("afterbegin", `<div class="rich-note">${esc(missingNote(e))}</div>`);
+    return true;
+  }
+
   async function hydrateRich() {
     const nodes = document.querySelectorAll("#view .rich");
     for (const el of nodes) {
@@ -823,7 +840,7 @@
         if (!resp.ok) throw new Error(String(resp.status));
         el.innerHTML = await resp.text();
       } catch (e) {
-        el.textContent = "原文加载失败：" + (e.message || e);
+        if (!fallbackToPlain(el, e)) el.textContent = missingNote(e);
         continue;
       }
       markRich(el, side);
@@ -985,7 +1002,7 @@
           continue;
         }
       } catch (e) {
-        el.textContent = "原文加载失败：" + (e.message || e);
+        if (!fallbackToPlain(el, e)) el.textContent = missingNote(e);
         continue;
       }
       markRich2(el, side);

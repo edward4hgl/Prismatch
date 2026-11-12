@@ -119,14 +119,18 @@ def _merge_lines(lines):
     return out
 
 
-def ocr_pdf(data: bytes, max_pages: int = 40, dpi: int = 300,
+def ocr_pdf(data: bytes, pages=None, max_pages: int = 0, dpi: int = 300,
             progress=None, cancel=None):
-    """Return (blocks, meta). blocks: [(page_no, text)].
+    """OCR the pages a PDF has no text layer for.
 
-    meta = {"pages_total", "pages_done", "lang", "truncated", "error"}
+    pages: 1-based page numbers to recognise; None means every page.
+    max_pages: 0 = no limit (only used as an emergency stop).
+    Return (blocks, meta); blocks: [(page_no, text)], meta carries
+    pages_total / pages_asked / pages_done / lang / truncated / error.
     Never raises: any failure yields ([], meta with error).
     """
-    meta = {"pages_total": 0, "pages_done": 0, "lang": "", "truncated": False, "error": ""}
+    meta = {"pages_total": 0, "pages_asked": 0, "pages_done": 0,
+            "lang": "", "truncated": False, "error": ""}
     mod = _fitz()
     if mod is None:
         meta["error"] = "no_pymupdf"
@@ -145,23 +149,31 @@ def ocr_pdf(data: bytes, max_pages: int = 40, dpi: int = 300,
         try:
             total = int(doc.page_count)
             meta["pages_total"] = total
-            limit = total if max_pages <= 0 else min(total, max_pages)
-            meta["truncated"] = limit < total
-            for i in range(limit):
+            if pages is None:
+                want = list(range(1, total + 1))
+            else:
+                want = sorted({int(p) for p in pages if 1 <= int(p) <= total})
+            meta["pages_asked"] = len(want)
+            if max_pages > 0 and len(want) > max_pages:
+                want = want[:max_pages]
+                meta["truncated"] = True
+            done = 0
+            for page in want:
                 if cancel is not None and cancel.is_set():
                     meta["error"] = "cancelled"
                     break
                 try:
-                    pix = doc[i].get_pixmap(dpi=dpi)
-                    pix.save(os.path.join(tmp, "p%05d.png" % (i + 1)))
+                    pix = doc[page - 1].get_pixmap(dpi=dpi)
+                    pix.save(os.path.join(tmp, "p%05d.png" % page))
                 except Exception:
                     continue
+                done += 1
                 if progress is not None:
                     try:
-                        progress(i + 1, limit)
+                        progress(done, len(want))
                     except Exception:
                         pass
-            meta["pages_done"] = limit
+            meta["pages_done"] = done
         finally:
             doc.close()
 
