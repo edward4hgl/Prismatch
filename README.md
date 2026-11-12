@@ -2,6 +2,8 @@
 
 > 本地标书查重工具。文件夹即投标单位，跨单位两两比对，找出抄袭与围标线索。
 > **Developed by edward4hgl with DSH**
+>
+> 当前版本 **v1.1**（界面左下角常显版本号）
 
 Windows 单机版，免安装、不联网、不上传任何文档：解析、比对、出报告全部在本机完成。
 
@@ -65,6 +67,8 @@ python run_check.py --group 单位A=.\标书A --group 单位B=.\标书B --tender
 pyinstaller Prismatch.spec
 # 产物：dist\Prismatch\Prismatch.exe
 ```
+
+发给别人时把 `Prismatch` 整个文件夹压缩发送即可——解压后双击 `Prismatch.exe` 就能用，不需要装 Python，也不需要管理员权限。首次运行会在同目录下建 `data\`（报告、排版快照、缓存）和 `logs\`，删掉这两个目录等于恢复出厂。
 
 `launcher.py` 用 pywebview（WebView2）把本地服务包成桌面窗口：
 
