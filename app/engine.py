@@ -8,12 +8,20 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
-from . import extract, ocr as ocr_mod, rules, sim, text as T, wordconv
+from . import extract, ocr as ocr_mod, officeconv, rules, sim, text as T
 
 MAX_BLOCK_TEXT = 6000
 MAX_BLOCKS_PER_PAIR = 400
 MAX_IMAGE_PAIRS = 4000
 TENDER_THRESHOLD = 0.55
+
+# 旧格式转换后的说明（报告里不再展示，仅写入日志与结果，便于排查）
+CONV_NOTE = {
+    "doc": "旧版 .doc 已按 Word 排版转换",
+    "rtf": "RTF 已按 Word 转换",
+    "xls": "旧版 .xls 已按 Excel 转换",
+    "ppt": "旧版 .ppt 已按 PowerPoint 转换",
+}
 
 
 class Cancelled(Exception):
@@ -141,7 +149,7 @@ def _build_doc(idx, name, data, options, group=None, tender=None, path="", force
     else:
         kind, blocks = extract.extract(name, data, force_kind=force_kind or None)
         if force_kind and force_kind != source_kind:
-            note = "旧版 .doc 已按 Word 排版转换"
+            note = CONV_NOTE.get(source_kind, "已按 %s 转换" % force_kind)
     paras, segs = [], []
     for block in blocks:
         is_table = str(getattr(block, "kind", "para")) == "table"
@@ -449,26 +457,29 @@ def analyze(files, tender_files=None, options=None, progress=None, cancel=None):
 
     report("extract", 0, len(files), None)
 
-    # ---- legacy .doc: one Word instance converts the whole batch up front ----
+    # ---- legacy Office binaries: one Office process per family, batched ----
     options["_cancel"] = cancel
     forced = {}
     if options.get("word_convert", True):
-        pending = [
-            (i, item[1])
-            for i, item in enumerate(files)
-            if extract.kind_of(item[0]) == "doc"
-        ]
-        if pending and wordconv.available():
-            converted = wordconv.convert_batch(
+        pending = []
+        kinds = {}
+        for i, item in enumerate(files):
+            kind = extract.kind_of(item[0])
+            if kind in CONV_NOTE:
+                pending.append((i, item[1], kind))
+                kinds[i] = kind
+        if pending and officeconv.available():
+            converted = officeconv.convert_batch(
                 pending,
                 cache_dir=options.get("conv_dir", ""),
                 cancel=cancel,
             )
+            target = {"doc": "docx", "rtf": "docx", "xls": "xlsx", "ppt": "pptx"}
             for i, blob in converted.items():
                 if blob:
                     item = files[i]
                     files[i] = (item[0], blob, item[2]) + tuple(item[3:])
-                    forced[i] = "docx"
+                    forced[i] = target.get(kinds.get(i, ""), "docx")
 
     for i, item in enumerate(files):
         name, data, group = item[0], item[1], item[2]
@@ -736,8 +747,16 @@ def build_keyinfo_rows(docs):
 
 
 def build_property_rows(docs):
+    """文档属性重复。
+
+    只保留「跨单位」的重复：同一作者 / 公司 / 时间出现在两个及以上投标单位才算线索，
+    同一单位内部重复（例如同事之间互相保存过）没有围标含义，不列出。
+    若整份报告没有分组（普通查重），则退化为「出现在 ≥2 份文件」。
+    """
     fields = [("author", "作者"), ("last_modified_by", "最后保存者"),
               ("company", "公司"), ("created", "创建时间"), ("modified", "修改时间")]
+    grouped = any((d.group or "") for d in docs)
+    by_id = {d.id: d for d in docs}
     rows = []
     for key, name in fields:
         buckets = defaultdict(list)
@@ -746,8 +765,13 @@ def build_property_rows(docs):
             if v:
                 buckets[str(v)].append(d.id)
         for value, ids in buckets.items():
-            if len(ids) >= 2:
-                rows.append({"field": key, "label": name, "value": value, "docs": sorted(ids)})
+            if len(ids) < 2:
+                continue
+            if grouped:
+                groups = {(by_id[i].group or "未分组") for i in ids if i in by_id}
+                if len(groups) < 2:
+                    continue
+            rows.append({"field": key, "label": name, "value": value, "docs": sorted(ids)})
     return rows
 
 

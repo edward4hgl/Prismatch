@@ -36,7 +36,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Prismatch',
+    name='棱镜 Prismatch',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -56,5 +56,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='Prismatch',
+    name='棱镜 Prismatch',
 )

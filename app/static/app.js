@@ -11,48 +11,14 @@ const S = {
 const OK_EXT = /\.(docx?|pptx?|pdf|xlsx?|txt|md)$/i;
 const MAX_MB = 200;
 
-/* ---------------- theme（默认跟随系统，手动切换后固定） ---------------- */
-const THEME_KEY = "tc-theme";
-const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+/* ---------------- theme（极客终端＝深色，其余浅色；不提供手动切换） ---------------- */
+let currentTheme = "light";
 
-function systemTheme() {
-  return darkQuery.matches ? "dark" : "light";
-}
-
-function applyTheme(name) {
-  currentTheme = name === "dark" ? "dark" : "light";
+function applyTheme() {
+  const skin = document.documentElement.dataset.skin;
+  currentTheme = skin === "geek" ? "dark" : "light";
   document.documentElement.dataset.theme = currentTheme;
-  const btn = $("themeBtn");
-  if (btn) {
-    const manual = !!localStorage.getItem(THEME_KEY);
-    btn.title = `主题：${currentTheme === "dark" ? "深色" : "浅色"}（${manual ? "手动" : "跟随系统"}，右键恢复跟随系统）`;
-  }
 }
-
-let currentTheme = "dark";
-const urlTheme = new URLSearchParams(location.search).get("theme");
-applyTheme(urlTheme || localStorage.getItem(THEME_KEY) || systemTheme());
-
-const onSystemThemeChange = (e) => {
-  if (localStorage.getItem(THEME_KEY)) return;   // 手动模式下不跟随
-  applyTheme(e.matches ? "dark" : "light");
-};
-if (darkQuery.addEventListener) darkQuery.addEventListener("change", onSystemThemeChange);
-else if (darkQuery.addListener) darkQuery.addListener(onSystemThemeChange);
-
-$("themeBtn").onclick = () => {
-  const n = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  localStorage.setItem(THEME_KEY, n);
-  applyTheme(n);
-  toast(`已切换为${n === "dark" ? "深色" : "浅色"}主题（右键恢复跟随系统）`);
-};
-
-$("themeBtn").oncontextmenu = (e) => {
-  e.preventDefault();
-  localStorage.removeItem(THEME_KEY);
-  applyTheme(systemTheme());
-  toast("已恢复跟随系统主题");
-};
 
 /* ---------------- skin（默认液态玻璃） ---------------- */
 const SKIN_KEY = "tc-skin";
@@ -61,8 +27,7 @@ const SKINS = { apple: "液态玻璃", geek: "极客终端", pixel: "可爱像�
 function applySkin(name) {
   const skin = SKINS[name] ? name : "apple";
   document.documentElement.dataset.skin = skin;
-  // 三套皮肤都支持浅色 / 深色，不再强制
-  applyTheme(currentTheme);
+  applyTheme();
   const menu = $("skinMenu");
   if (menu) {
     menu.querySelectorAll("button").forEach((b) =>
@@ -155,6 +120,8 @@ function setStage(key, done, total) {
   $("barFill").style.width = overall + "%";
   const track = $("barTrack");
   if (track) track.style.setProperty("--p", overall);
+  const prog = $("progress");
+  if (prog) prog.classList.toggle("done", overall >= 99.5);
   $("progPct").textContent = Math.round(overall) + "%";
   $("progTitle").textContent = st.t;
   document.querySelectorAll("#barSteps .step-item").forEach((el, i) => {
@@ -953,9 +920,11 @@ function notify(text, rec) {
     n.className = "notify";
     document.body.appendChild(n);
   }
-  n.innerHTML = `<div class="n-title">检测完成</div>
+  n.innerHTML = `<div class="n-card">
+    <div class="n-title">检测完成</div>
     <div class="n-body">${text}<br>报告已保存，可随时查看。</div>
-    <div class="n-acts"><button id="nGo">查看报告</button><button id="nClose">关闭</button></div>`;
+    <div class="n-acts"><button id="nGo">查看报告</button><button id="nClose">关闭</button></div>
+  </div>`;
   n.classList.add("on");
   document.getElementById("nGo").onclick = () => {
     n.classList.remove("on");
@@ -963,8 +932,6 @@ function notify(text, rec) {
     else { renderReportList(); go("reports"); }
   };
   document.getElementById("nClose").onclick = () => n.classList.remove("on");
-  clearTimeout(n._t);
-  n._t = setTimeout(() => n.classList.remove("on"), 20000);
 }
 
 function poll() {
@@ -987,7 +954,11 @@ function poll() {
         aborter = null;
         $("stopBtn").classList.add("hidden"); $("runBtn").classList.remove("hidden"); document.querySelector(".submitbar").classList.remove("running");
         setStage("finish", 2, 2);
-        $("progSub").textContent = "正在生成报告";
+        const nPairs = (j.result.pairs || []).length;
+        $("progTitle").textContent = "检测完成";
+        $("progSub").textContent = nPairs
+          ? `共 ${(j.result.docs || []).length} 份文档 · 检出 ${nPairs} 组相似，报告已保存`
+          : `共 ${(j.result.docs || []).length} 份文档 · 未检出相似，报告已保存`;
         const rec = { id: jobId, time: new Date().toLocaleString("zh-CN"), result: j.result, tender: [] };
         loadReports().then(() => {
           if (S.page === "reports") renderReportList();
@@ -996,14 +967,9 @@ function poll() {
           toast(`有 ${j.result.errors.length} 份文件解析失败，已跳过并记入报告`);
         }
         setTimeout(() => {
-          $("progress").classList.add("hidden");
           $("runBtn").disabled = false;
-          if (S.page === "check") {
-            openReport(rec);
-          } else {
-            const n = (j.result.pairs || []).length;
-            notify(`已完成 ${n} 组相似对比`, rec);
-          }
+          const n = (j.result.pairs || []).length;
+          notify(`已完成 ${n} 组相似对比`, rec);
         }, 400);
         return;
       }
@@ -1026,6 +992,8 @@ function poll() {
 }
 
 function setProgressReset() {
+  const prog = $("progress");
+  if (prog) prog.classList.remove("done");
   setStage("upload", 0, 1);
   $("progSub").textContent = "准备中";
 }
@@ -1054,8 +1022,8 @@ async function loadReports() {
   } catch (_) {
     S.reports = [];
   }
-  S.reports.sort((a, b) =>
-    ((b.stats && b.stats.max_score) || 0) - ((a.stats && a.stats.max_score) || 0));
+  // 历史记录按对比时间排：最近的在最前
+  S.reports.sort((a, b) => String(b.time || "").localeCompare(String(a.time || "")));
   return S.reports;
 }
 
@@ -1105,9 +1073,6 @@ async function openSavedReport(meta) {
 function openReport(rec) {
   go("report");
   Report.open(rec.result, { time: rec.time, tender: rec.tender, job: rec.id });
-  document.querySelectorAll("#specTabs .tab2").forEach((b) =>
-    b.onclick = () => Report.setView(b.dataset.view));
-  $("expBtn").onclick = () => window.open("/api/reports/" + rec.id + "/export", "_blank");
 }
 
 /* ---------------- misc ---------------- */

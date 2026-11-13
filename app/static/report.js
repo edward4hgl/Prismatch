@@ -10,10 +10,11 @@
   function hl(text, spans) {
     if (!spans || !spans.length) return esc(text);
     let out = "", pos = 0;
-    for (const [s, e, sc] of spans.slice().sort((x, y) => x[0] - y[0])) {
+    for (const [s, e, sc, idx] of spans.slice().sort((x, y) => x[0] - y[0])) {
       if (s < pos) continue;
       out += esc(text.slice(pos, s));
-      out += `<mark class="${sc >= 0.8 ? "hit" : "warn"}">${esc(text.slice(s, e))}</mark>`;
+      const item = idx == null ? "" : ` data-item="${idx}"`;
+      out += `<mark class="${sc >= 0.8 ? "hit" : "warn"}"${item}>${esc(text.slice(s, e))}</mark>`;
       pos = e;
     }
     return out + esc(text.slice(pos));
@@ -138,12 +139,7 @@
       document.body.appendChild(area);
     }
     area.innerHTML = out.join("");
-    document.body.classList.add("printing");
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove("printing");
-      area.innerHTML = "";
-    }, 800);
+    showPrintArea();
   }
 
   async function buildFullPrint(side) {
@@ -258,14 +254,61 @@
     return area;
   }
 
+  /* 打印前把"一屏高度 + 滚动容器"这两件事彻底去掉，否则 WebView2 只肯输出一页。
+     用内联样式 + important，优先级压过 style.css 里 body{overflow-x:hidden} 的
+     !important 规则（内联的 !important 永远最大）。 */
+  const PRINT_SAVED = [];
+
+  function lockScrollForPrint() {
+    const set = (el, props) => {
+      if (!el) return;
+      for (const [k, v] of Object.entries(props)) {
+        PRINT_SAVED.push([el, k, el.style.getPropertyValue(k), el.style.getPropertyPriority(k)]);
+        el.style.setProperty(k, v, "important");
+      }
+    };
+    set(document.documentElement, {
+      height: "auto", "min-height": "0", overflow: "visible", "overflow-y": "visible",
+    });
+    set(document.body, {
+      height: "auto", "min-height": "0", overflow: "visible", "overflow-y": "visible",
+      position: "static", display: "block",
+    });
+    const area = document.getElementById("printArea");
+    set(area, { display: "block", height: "auto", "max-height": "none", overflow: "visible" });
+  }
+
+  function unlockScrollForPrint() {
+    while (PRINT_SAVED.length) {
+      const [el, k, v, p] = PRINT_SAVED.pop();
+      if (v) el.style.setProperty(k, v, p);
+      else el.style.removeProperty(k);
+    }
+  }
+
   function showPrintArea() {
     document.body.classList.add("printing");
-    window.print();
-    setTimeout(() => {
+    lockScrollForPrint();
+    window.scrollTo(0, 0);
+    let cleaned = false;
+    const done = () => {
+      if (cleaned) return;
+      cleaned = true;
+      window.removeEventListener("afterprint", done);
       document.body.classList.remove("printing");
+      unlockScrollForPrint();
       const area = document.getElementById("printArea");
       if (area) area.innerHTML = "";
-    }, 800);
+    };
+    // 打印对话框关闭后浏览器会派发 afterprint；某些宿主不派发，用长超时兜底。
+    // 千万别用短超时：WebView2 里 window.print() 可能立即返回，
+    // 提前恢复样式会让内容塌回一屏高度，结果只打出一页。
+    window.addEventListener("afterprint", done);
+    try {
+      window.print();
+    } finally {
+      setTimeout(done, 120000);
+    }
   }
 
   function buildFullPrintText(side) {
@@ -307,12 +350,7 @@
       document.body.appendChild(area);
     }
     area.innerHTML = out.join("");
-    document.body.classList.add("printing");
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove("printing");
-      area.innerHTML = "";
-    }, 800);
+    showPrintArea();
   }
 
   function buildPageMap(doc) {
@@ -359,8 +397,6 @@
     else if (R.view === "para") box.innerHTML = detailView("para");
     else if (R.view === "pic") box.innerHTML = pictures();
     else if (R.view === "files") box.innerHTML = files();
-    document.querySelectorAll("#specTabs .tab2").forEach((b) =>
-      b.classList.toggle("active", b.dataset.view === R.view));
     wire();
     if (R.view === "sentence" || R.view === "para") {
       if (document.querySelector("#view .rich")) hydrateRich2();
@@ -379,6 +415,14 @@
 
   const fileLink = (docId, name) =>
     `<a href="#" class="filelink" data-doc="${docId}" title="用本机默认程序打开原文件">${esc(name)}</a>`;
+
+  // 数字本身就是入口：蓝色可点，0 值置灰不可点，省掉一列按钮
+  const numCell = (idx, tab, n, unit) => {
+    const v = Number(n) || 0;
+    if (idx < 0 || v <= 0) return `<td class="num zero">${v}</td>`;
+    const label = tab === "sentence" ? "相似句子" : tab === "para" ? "相似段落" : "相似图片";
+    return `<td class="num"><button type="button" class="numlink" data-pair="${idx}" data-tab="${tab}" title="查看${label}（${v} ${unit}）">${v}</button></td>`;
+  };
 
   async function openFile(docId) {
     const doc = (R.res && R.res.docs) ? R.res.docs[docId] : null;
@@ -406,9 +450,60 @@
     }
   }
 
+  // 右键文件名：在资源管理器里定位并选中（不是只打开文件夹）
+  async function revealFile(docId) {
+    const doc = (R.res && R.res.docs) ? R.res.docs[docId] : null;
+    const original = (doc && doc.path) || "";
+
+    try {
+      if (original && window.pywebview && window.pywebview.api && window.pywebview.api.reveal_path) {
+        const r = await window.pywebview.api.reveal_path(original);
+        if (r && r.ok) return;
+      }
+    } catch (_) { /* 退回 HTTP */ }
+
+    if (!R.meta.job) return;
+    try {
+      const res = await fetch("/api/reveal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job: R.meta.job, doc: docId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || ("HTTP " + res.status));
+    } catch (e) {
+      alert("定位文件失败：" + (e.message || e));
+    }
+  }
+
+  let ctxEl = null;
+  function closeCtx() {
+    if (ctxEl) { ctxEl.remove(); ctxEl = null; }
+  }
+
+  function openCtx(x, y, docId) {
+    closeCtx();
+    const el = document.createElement("div");
+    el.className = "ctxmenu";
+    el.innerHTML = `<button type="button" class="ctx-item" data-reveal="${docId}">在文件夹中显示</button>`;
+    document.body.appendChild(el);
+
+    const box = el.getBoundingClientRect();
+    const left = Math.min(Math.max(8, x), window.innerWidth - box.width - 8);
+    const top = Math.min(Math.max(8, y), window.innerHeight - box.height - 8);
+    el.style.left = left + "px";
+    el.style.top = top + "px";
+
+    el.querySelector("[data-reveal]").onclick = () => {
+      const id = Number(el.querySelector("[data-reveal]").dataset.reveal);
+      closeCtx();
+      revealFile(id);
+    };
+    ctxEl = el;
+  }
+
   /* ---------------- summary ---------------- */
-  function summary() {
-    const r = R.res, s = r.stats, names = r.docs.map((d) => d.name);
+  function summary() {    const r = R.res, s = r.stats, names = r.docs.map((d) => d.name);
     const docsLine = names.map((n, i) => {
       const g = r.docs[i].group;
       return `<span class="tag"><b>${esc(n)}</b>${g ? " · " + esc(g) : ""}</span>`;
@@ -427,25 +522,57 @@
     const keyLine = r.keyinfo.length
       ? r.keyinfo.map((g) => `${esc(g.label)} <b>${g.items.length}</b> 处`).join(" · ")
       : `<span class="dim">无</span>`;
-    const propLine = r.properties.length
-      ? `<b>${r.properties.length}</b> 项重复（作者 / 公司 / 时间）`
+    const propKept = (r.properties || []).filter((p) => {
+      const units = new Set((p.docs || []).map((id) => (r.docs[id] || {}).group || "未分组"));
+      return units.size >= 2 || (units.size === 1 && units.has("未分组"));
+    });
+    const propLine = propKept.length
+      ? `<b>${propKept.length}</b> 项跨单位重复（作者 / 公司 / 时间）`
       : `<span class="dim">无</span>`;
+
+    const propRows = propKept.map((p, pi) => {
+      const names = (p.docs || []).map((id) => r.docs[id]).filter(Boolean);
+      const byUnit = new Map();
+      for (const d of names) {
+        const g = d.group || "未分组";
+        if (!byUnit.has(g)) byUnit.set(g, []);
+        byUnit.get(g).push(d);
+      }
+      const entries = [...byUnit.entries()];
+      const band = pi % 2 ? "pb" : "pa";
+      return entries.map(([unit, list], k) => {
+        const shown = list.slice(0, 3).map((d) => esc(d.name)).join("、");
+        const more = list.length > 3 ? ` 等 ${list.length} 份` : "";
+        const head = k === 0
+          ? `<td class="ctr" rowspan="${entries.length}">${esc(p.label)}</td>` +
+            `<td class="ctr pval" rowspan="${entries.length}">${esc(p.value)}</td>` +
+            `<td class="ctr num" rowspan="${entries.length}">${names.length}</td>`
+          : "";
+        return `<tr class="${band}${k ? " punit-row" : ""}">${head}<td class="punit">${esc(unit)}</td>` +
+          `<td class="pfile">${shown}${more}</td></tr>`;
+      }).join("");
+    }).join("");
+    const propBlock = propKept.length ? `
+      <div class="card prop-card">
+        <div class="prop-head" id="propHead"><span class="chev">▶</span> 文档属性重复（${propKept.length} 项）
+          <span class="h3-tip">同一作者 / 公司 / 时间出现在多份文件里，点开看明细</span></div>
+        <div class="prop-body hidden" id="propBody">
+          <table class="tbl"><thead><tr><th>字段</th><th>值</th><th class="num">文件数</th><th>涉及单位</th><th>文件</th></tr></thead>
+          <tbody>${propRows}</tbody></table>
+        </div>
+      </div>` : "";
 
     const gp = r.groupPairs || [];
     const gpBlocks = gp.map((g, gi) => {
       const fileRows = (g.files || []).map((f) => {
         const idx = r.pairs.findIndex((p) =>
           (p.a === f.a && p.b === f.b) || (p.a === f.b && p.b === f.a));
-        const btns = idx >= 0
-          ? `<button class="linkbtn" data-pair="${idx}" data-tab="sentence">句子</button>
-             <button class="linkbtn" data-pair="${idx}" data-tab="para">段落</button>
-             <button class="linkbtn" data-pair="${idx}" data-tab="pic">图片</button>`
-          : "";
         return `<tr>
           <td>${fileLink(f.a, f.name_a)}</td><td>${fileLink(f.b, f.name_b)}</td>
-          <td>${f.sentences}</td><td>${f.paragraphs}</td><td>${f.images}</td>
+          ${numCell(idx, "sentence", f.sentences, "句")}
+          ${numCell(idx, "para", f.paragraphs, "段")}
+          ${numCell(idx, "pic", f.images, "张")}
           <td><b>${(f.score * 100).toFixed(1)}%</b></td>
-          <td class="act">${btns}</td>
         </tr>`;
       }).join("");
       const cls = g.score >= 0.8 ? "hi" : g.score >= 0.5 ? "mid" : "lo";
@@ -458,7 +585,7 @@
         </div>
         <div class="grp-body">
           ${fileRows
-            ? `<table class="tbl"><thead><tr><th>文件 1</th><th>文件 2</th><th>句子</th><th>段落</th><th>图片</th><th>重复率</th><th></th></tr></thead><tbody>${fileRows}</tbody></table>`
+            ? `<table class="tbl"><thead><tr><th>${esc(g.a)}</th><th>${esc(g.b)}</th><th class="num">句子</th><th class="num">段落</th><th class="num">图片</th><th class="num">重复率</th></tr></thead><tbody>${fileRows}</tbody></table>`
             : `<p class="note small">这两家之间没有检出相似内容</p>`}
         </div>
       </div>`;
@@ -469,17 +596,11 @@
         <td>${i + 1}</td>
         <td>${fileLink(p.a, names[p.a])}</td>
         <td>${fileLink(p.b, names[p.b])}</td>
-        <td class="act"><button class="linkbtn" data-pair="${i}" data-tab="sentence">${p.sentences} 句</button></td>
-        <td class="act"><button class="linkbtn" data-pair="${i}" data-tab="para">${p.paragraphs} 段</button></td>
-        <td class="act"><button class="linkbtn" data-pair="${i}" data-tab="pic">${p.images || 0} 张</button></td>
-        <td class="act"><b>${(p.score * 100).toFixed(1)}%</b></td>
-      </tr>`).join("") || `<tr class="empty"><td colspan="7">没有超过阈值的相似内容</td></tr>`;
-
-    const notes = (r.docs || []).filter((d) => d && d.note);
-    const noteBlock = notes.length ? `<div class="card">
-      <h3 class="h3">文本来源说明</h3>
-      ${notes.map((d) => `<div class="note small">· <b>${esc(d.name)}</b>：${esc(d.note)}</div>`).join("")}
-    </div>` : "";
+        ${numCell(i, "sentence", p.sentences, "句")}
+        ${numCell(i, "para", p.paragraphs, "段")}
+        ${numCell(i, "pic", p.images || 0, "张")}
+        <td><b>${(p.score * 100).toFixed(1)}%</b></td>
+      </tr>`).join("") || `<tr class="empty"><td colspan="6">没有超过阈值的相似内容</td></tr>`;
 
     const errs = r.errors || [];
     const errBlock = errs.length ? `<div class="card" style="border-color:rgba(255,91,127,.35)">
@@ -489,7 +610,6 @@
 
     return `
     ${errBlock}
-    ${noteBlock}
     <div class="sumgrid">
       <div class="sumcard"><div class="k">送检文档</div><div class="v">${s.docs} 份</div></div>
       <div class="sumcard"><div class="k">最大相似句子</div><div class="v hot">${s.max_sentences}</div></div>
@@ -506,8 +626,9 @@
         <div class="k">关键信息</div><div>${keyLine}</div>
         <div class="k">文档属性</div><div>${propLine}</div>
       </div>
+      ${propBlock}
       ${gp.length
-        ? `<h3 class="h3">公司级对比（共 ${gp.length} 组 · 点击展开）</h3>${gpBlocks}
+        ? `<h3 class="h3">公司级对比（共 ${gp.length} 组 · 点击展开）<span class="h3-tip">左键单击文件名打开文件，右键单击文件名在文件夹显示</span></h3>${gpBlocks}
            <p class="note small">跨公司按内容比对：任一文件与对方任一文件交叉比较，与文件名无关；招标文件夹的内容已先行剔除。</p>`
         : `<h3 class="h3">文件级明细</h3>
            <table class="tbl">
@@ -598,10 +719,19 @@
   /* ---------------- pictures ---------------- */
   function pictures() {
     const r = R.res, p = r.pairs[R.pair];
-    const back = (title, extra) => `<div class="detailbar">
-        <button class="mini" id="picBack">← 返回汇总</button>
-        ${title ? `<b>${esc(title)}</b>` : ""}
-        <span class="hint">${extra || ""}</span>
+    const vt = (cur) => {
+      const n = (v) => (v === "sentence" ? p.sentences : v === "para" ? p.paragraphs : (p.images || 0));
+      return [["sentence", "相似句子"], ["para", "相似段落"], ["pic", "相似图片"]]
+        .map(([v, label]) => `<button class="mini vtab${cur === v ? " on" : ""}" data-vtab="${v}"${n(v) ? "" : " disabled"}>${label}</button>`)
+        .join("");
+    };
+    const back = (title, extra) => `<div class="detailbar stack">
+        <div class="db-row">
+          <button class="mini" id="picBack">← 返回汇总</button>
+          <span class="vtabs">${p ? vt("pic") : ""}</span>
+          <button class="mini" id="printBtn">打印报告</button>
+        </div>
+        ${title || extra ? `<div class="db-row db-title">${title ? `<b>${esc(title)}</b>` : ""}<span class="hint">${extra || ""}</span></div>` : ""}
       </div>`;
     if (!p) return `${back("", "")}<div class="card">没有可展示的相似图片。</div>`;
     const names = r.docs.map((d) => d.name);
@@ -701,12 +831,12 @@
 
     const spans = (side) => {
       const map = {};
-      for (const it of items) {
+      items.forEach((it, k) => {
         const para = side === "a" ? it.a_para : it.b_para;
         const s = side === "a" ? it.a_start : it.b_start;
         const e = side === "a" ? it.a_end : it.b_end;
-        if (e > s) (map[para] = map[para] || []).push([s, e, 1]);
-      }
+        if (e > s) (map[para] = map[para] || []).push([s, e, 1, k]);
+      });
       return map;
     };
     const spA = spans("a"), spB = spans("b");
@@ -737,10 +867,23 @@
       </div>`;
     };
 
-    return `<div class="detailbar">
-        <button class="mini" id="backSummary">← 返回汇总</button>
-        <b>${esc(A.name)}</b><span class="arrow">↔</span><b>${esc(B.name)}</b>
-        <span class="hint">共 ${items.length} 处相似 · 点击标红处可定位</span>
+    const unit = mode === "sentence" ? "句" : "段";
+    const lbl = mode === "sentence" ? "句子" : "段落";
+    const total = mode === "sentence" ? p.sentences : p.paragraphs;
+    const headTxt = total === items.length
+      ? `共 ${items.length} 处相似`
+      : `相似${lbl} ${total} ${unit} · 分 ${items.length} 处`;
+    const vtabs = [["sentence", "相似句子", p.sentences], ["para", "相似段落", p.paragraphs], ["pic", "相似图片", p.images || 0]]
+      .map(([v, label, n]) => `<button class="mini vtab${mode === v ? " on" : ""}" data-vtab="${v}"${n ? "" : " disabled"}>${label}</button>`)
+      .join("");
+    return `<div class="detailbar stack">
+        <div class="db-row">
+          <button class="mini" id="backSummary">← 返回汇总</button>
+          <span class="vtabs">${vtabs}</span>
+          <button class="mini" id="printBtn">打印报告</button>
+          <button class="mini paper-btn" id="paperBtn" type="button" title="正文：纸面 / 深色"><span class="half"></span></button>
+        </div>
+        <div class="db-row db-title"><b>${esc(A.name)}</b><span class="arrow">↔</span><b>${esc(B.name)}</b><span class="hint">${headTxt} · 点击标红处可定位</span></div>
       </div>
       <div class="two-pane">${pane(A, spA, "a")}${pane(B, spB, "b")}</div>`;
   }
@@ -1215,13 +1358,49 @@
     openFile(Number(a.dataset.doc));
   });
 
+  // 右键文件名：在文件夹中显示并选中
+  document.addEventListener("contextmenu", (ev) => {
+    const a = ev.target.closest ? ev.target.closest("a.filelink") : null;
+    if (!a) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    openCtx(ev.clientX, ev.clientY, Number(a.dataset.doc));
+  });
+  document.addEventListener("click", (ev) => {
+    if (ctxEl && !ctxEl.contains(ev.target)) closeCtx();
+  }, true);
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") closeCtx();
+  });
+  window.addEventListener("resize", closeCtx);
+  window.addEventListener("blur", closeCtx);
+
   /* ---------------- wiring ---------------- */
   function wire() {
     const box = document.getElementById("view");
+    const paperBtn = document.getElementById("paperBtn");
+    if (paperBtn) {
+      paperBtn.onclick = () => {
+        const on = document.documentElement.dataset.paper === "1";
+        if (on) {
+          delete document.documentElement.dataset.paper;
+          localStorage.setItem("tc-paper", "0");
+        } else {
+          document.documentElement.dataset.paper = "1";
+          localStorage.setItem("tc-paper", "1");
+        }
+      };
+    }
     box.querySelectorAll(".grp-head").forEach((h) => {
       h.onclick = (ev) => {
         if (ev.target.closest("button")) return;
-        h.parentElement.classList.toggle("open");
+        const blk = h.parentElement;
+        const willOpen = !blk.classList.contains("open");
+        // 手风琴：同一时刻只展开一组，避免页面被撑得很长
+        box.querySelectorAll(".grp-block.open").forEach((o) => {
+          if (o !== blk) o.classList.remove("open");
+        });
+        blk.classList.toggle("open", willOpen);
       };
     });
     box.querySelectorAll("[data-pair]").forEach((el) => {
@@ -1256,11 +1435,29 @@
         setView("summary");
       };
     }
-    const backSummary = document.getElementById("backSummary");
-    if (backSummary) {
+    const backSummary = document.getElementById("backSummary");    if (backSummary) {
       backSummary.onclick = () => {
         R.focus = R.origin;      // 回到刚才点的那一行
         setView("summary");
+      };
+    }
+    box.querySelectorAll("[data-vtab]").forEach((b) => {
+      b.onclick = () => {
+        if (b.disabled) return;
+        const v = b.dataset.vtab;
+        if (v === R.view) return;
+        setView(v);
+      };
+    });
+    const printBtn = document.getElementById("printBtn");
+    if (printBtn) printBtn.onclick = () => setView("print");
+    const propHead = document.getElementById("propHead");
+    if (propHead) {
+      propHead.onclick = () => {
+        const body = document.getElementById("propBody");
+        if (!body) return;
+        const open = body.classList.toggle("hidden") === false;
+        propHead.classList.toggle("open", open);
       };
     }
     box.querySelectorAll(".act-only").forEach((b) => {

@@ -1,6 +1,6 @@
 """Headless batch runner: compare folders on disk and write a report.
 
-    python run_check.py --out DIR --tender DIR --group 广东查重=DIR --group 华北查重=DIR
+    python run_check.py --out DIR --tender DIR --group 单位A=DIR --group 单位B=DIR
 """
 from __future__ import annotations
 

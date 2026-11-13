@@ -209,16 +209,21 @@ def _doc_legacy(data: bytes):
 
 
 def _ppt_legacy(data: bytes):
-    raise ValueError("旧版 .ppt 暂不支持，请另存为 .pptx")
+    raise ValueError("旧版 .ppt 未能转换（需要安装 PowerPoint），请另存为 .pptx 后重试")
 
 
 def _xls_legacy(data: bytes):
-    raise ValueError("旧版 .xls 暂不支持，请另存为 .xlsx")
+    raise ValueError("旧版 .xls 未能转换（需要安装 Excel），请另存为 .xlsx 后重试")
+
+
+def _rtf_legacy(data: bytes):
+    raise ValueError("RTF 未能转换（需要安装 Word），请另存为 .docx 后重试")
 
 
 EXTRACTORS = {
     "docx": _docx,
     "doc": _doc_legacy,
+    "rtf": _rtf_legacy,
     "pptx": _pptx,
     "ppt": _ppt_legacy,
     "pdf": _pdf,
@@ -230,6 +235,7 @@ EXTRACTORS = {
 EXT_KIND = {
     ".docx": "docx", ".docm": "docx",
     ".doc": "doc",
+    ".rtf": "rtf",
     ".pptx": "pptx", ".pptm": "pptx",
     ".ppt": "ppt",
     ".pdf": "pdf",

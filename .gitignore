@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -46,3 +46,9 @@ mockups/png/*.png
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 本机专用脚本（含本地绝对路径，不入库）
+tools/build_portable.ps1
+tools/pack.ps1
+# 内部交接文档（含本机约定与路径，不入库）
+HANDOVER.md

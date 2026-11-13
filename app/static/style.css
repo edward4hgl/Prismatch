@@ -1,4 +1,4 @@
-:root[data-theme="dark"]{
+﻿:root[data-theme="dark"]{
   --bg:#070a14; --fg:#e9edf9; --dim:#8b96b5; --line:rgba(255,255,255,.08);
   --panel:rgba(255,255,255,.045); --panel2:rgba(0,0,0,.25);
   --acc:#7c6cff; --acc2:#22d3ee; --bad:#ff5b7f; --warn:#ffbe50; --ok:#3ddc97;
@@ -238,6 +238,33 @@ mark.warn{background:rgba(255,190,80,.2);box-shadow:inset 0 -2px 0 rgba(255,190,
 .linkbtn{border:0;background:transparent;color:var(--acc2);cursor:pointer;font:inherit;
   font-size:12.5px;padding:2px 6px}
 .linkbtn.del{color:var(--bad)}
+
+/* 数字即入口：句子 / 段落 / 图片 三列直接可点，不再单列一排按钮 */
+.tbl th.num{text-align:center;white-space:nowrap;width:64px}
+.tbl td.num{padding:8px 8px;white-space:nowrap;text-align:center;width:64px;font-variant-numeric:tabular-nums}
+.tbl td.num.zero{color:var(--dim);opacity:.55}
+.numlink{border:0;background:transparent;padding:2px 4px;margin:-2px -4px;cursor:pointer;
+  font:inherit;font-size:13px;font-weight:600;color:var(--acc2);
+  border-radius:5px;transition:background .12s,color .12s}
+.numlink:hover{background:rgba(10,132,255,.1);text-decoration:underline}
+.numlink:focus-visible{outline:2px solid var(--acc2);outline-offset:1px}
+:root[data-skin="geek"] .numlink{font-family:inherit;letter-spacing:0}
+:root[data-skin="geek"] .numlink:hover{background:rgba(57,255,136,.12)}
+:root[data-skin="pixel"] .numlink:hover{background:rgba(255,143,183,.18)}
+
+/* 右键菜单：文件名 → 在文件夹中显示 */
+.ctxmenu{position:fixed;z-index:400;min-width:160px;max-width:320px;padding:5px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 12px 32px rgba(10,16,40,.28);animation:ctxIn .09s ease-out}
+@keyframes ctxIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.ctxmenu .ctx-item{display:block;width:100%;text-align:left;border:0;background:transparent;
+  color:var(--fg);font:inherit;font-size:13px;padding:8px 12px;border-radius:7px;cursor:pointer;
+  white-space:nowrap}
+.ctxmenu .ctx-item:hover{background:rgba(10,132,255,.12);color:var(--acc2)}
+:root[data-skin="geek"] .ctxmenu{border-radius:4px}
+:root[data-skin="geek"] .ctxmenu .ctx-item:hover{background:rgba(57,255,136,.14);color:var(--acc)}
+:root[data-skin="pixel"] .ctxmenu{border-radius:12px;border-width:2px}
+:root[data-skin="pixel"] .ctxmenu .ctx-item:hover{background:rgba(255,143,183,.2);color:#8a4a63}
 .submitbar{display:flex;align-items:center;gap:14px;margin-top:6px}
 .primary{width:auto;margin-top:0;padding:12px 34px;font-size:14.5px}
 .h2{font-size:18px;margin:4px 0 16px}
@@ -257,6 +284,9 @@ mark.warn{background:rgba(255,190,80,.2);box-shadow:inset 0 -2px 0 rgba(255,190,
 
 /* report detail */
 .repbar{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.icon-mini{width:34px;padding:0!important;display:inline-grid;place-items:center;font-size:14px;line-height:1}
+.h3-tip{font-weight:400;font-size:11.5px;color:var(--dim);margin-left:10px;letter-spacing:0}
+:root[data-skin="pixel"] .h3-tip{font-size:11px}
 .spectabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);
   padding:3px;border-radius:11px}
 .tab2{border:0;background:transparent;color:var(--dim);font:inherit;font-size:12.5px;
@@ -276,6 +306,57 @@ mark.warn{background:rgba(255,190,80,.2);box-shadow:inset 0 -2px 0 rgba(255,190,
 .tag b{font-weight:600;color:var(--fg)}
 .tag.warn{background:rgba(255,91,127,.12);border-color:rgba(255,91,127,.3)}
 .detailbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.detailbar.stack{display:block}
+.detailbar .db-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.detailbar .db-row + .db-row{margin-top:7px}
+.detailbar .db-title{font-size:13px;line-height:1.5}
+
+/* 对比页右下角：正文 纸面 / 深色（只在极客终端出现） */
+.paper-btn{display:none;align-items:center;justify-content:center;padding:4px 9px;margin-left:auto}
+.paper-btn .half{display:block;width:13px;height:13px;border-radius:50%;
+  border:1.6px solid currentColor;
+  background:linear-gradient(90deg,currentColor 0 50%,transparent 50% 100%);
+  transition:transform .18s ease}
+:root[data-skin="geek"] .paper-btn{display:inline-flex}
+:root[data-paper="1"] .paper-btn .half{transform:rotate(180deg)}
+
+/* 纸面正文：极客深色外壳下把两块对照区变成纸 */
+:root[data-skin="geek"][data-paper="1"] .pane-body{
+  background:#f7f7f2;color:#1d2321;
+  margin:10px;border:1px solid #d5d9cd;border-radius:3px;
+  font-family:"Microsoft YaHei UI","PingFang SC","Source Han Sans SC",sans-serif;
+  box-shadow:0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.55)}
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich{color:#1d2321}
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich h1,
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich h2,
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich h3,
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich h4{color:#14201b}
+/* 纸面配色向液态玻璃看齐：相似＝粉底红字，当前句＝亮黄 */
+:root[data-skin="geek"][data-paper="1"] .pane-body mark.hit{
+  background:#ffdfe6;color:#a32046;
+  box-shadow:inset 0 -2px 0 rgba(196,26,62,.3);border-radius:3px}
+:root[data-skin="geek"][data-paper="1"] .pane-body mark.warn{
+  background:#ffeab8;color:#8a5a00;
+  box-shadow:inset 0 -2px 0 rgba(200,150,40,.4);border-radius:3px}
+:root[data-skin="geek"][data-paper="1"] .pane-body mark.pink,
+:root[data-skin="geek"][data-paper="1"] .pane-body .hl2{
+  background:#ffd0dc;color:#a32046}
+/* 段落只给左侧一条竖线，避免整段泛黄、看不出是哪一句 */
+:root[data-skin="geek"][data-paper="1"] .pane-body .para.current,
+:root[data-skin="geek"][data-paper="1"] .pane-body [data-para].current{
+  background:transparent!important;
+  box-shadow:inset 3px 0 0 rgba(226,176,0,.8)!important}
+:root[data-skin="geek"][data-paper="1"] .pane-body mark.current,
+:root[data-skin="geek"][data-paper="1"] .pane-body mark.hit.current{
+  background:#ffe98a!important;color:#3d2b00!important;
+  box-shadow:0 0 0 2px rgba(226,176,0,.55)!important}
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich td,
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich th{
+  border-color:#c9cec4;color:#1d2321}
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich tr.hit-row td{background:rgba(255,91,127,.12)}
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich tr.current td{background:rgba(255,214,10,.45)!important}
+:root[data-skin="geek"][data-paper="1"] .pane-body .rich-note{color:#8a6a12;border-color:rgba(200,150,40,.45)}
+:root[data-skin="geek"][data-paper="1"] .pane-body .plain-fallback{color:#1d2321}
 .two-pane{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:1000px){.two-pane{grid-template-columns:1fr}}
 .pane{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden}
@@ -315,8 +396,16 @@ mark.warn{background:rgba(255,190,80,.2);box-shadow:inset 0 -2px 0 rgba(255,190,
 #printArea{display:none}
 @page{size:A4;margin:8mm}
 @media print{
+  /* 关键：html/body 设了 height:100%，打印时会把内容裁成一页 */
+  html,body{height:auto!important;min-height:0!important;overflow:visible!important;
+    background:#fff!important;color:#000!important}
   body.printing > *:not(#printArea){display:none!important}
-  body.printing #printArea{display:block}
+  body.printing #printArea{display:block!important}
+  #printArea{height:auto!important;max-height:none!important;overflow:visible!important}
+  #printArea *{max-height:none!important;overflow:visible!important}
+  #printArea .rich,#printArea .pr-full-rich,
+  #printArea .docx-wrapper,#printArea section.docx{
+    height:auto!important;max-height:none!important;overflow:visible!important}
   body.printing{background:#fff;color:#000}
   #printArea h1{font-size:16px;margin:0 0 4px}
   #printArea p{font-size:11px;margin:0 0 10px}
@@ -409,18 +498,22 @@ mark.warn{background:rgba(255,190,80,.2);box-shadow:inset 0 -2px 0 rgba(255,190,
   border-color:rgba(10,20,50,.14);box-shadow:0 14px 34px -12px rgba(20,30,60,.28)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
-/* 右下角完成提示 */
-.notify{position:fixed;right:22px;bottom:22px;width:270px;z-index:180;
-  background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  box-shadow:0 18px 40px rgba(0,0,0,.35);padding:14px 16px;
-  transform:translateY(12px);opacity:0;pointer-events:none;transition:.2s}
-.notify.on{transform:none;opacity:1;pointer-events:auto}
-.notify .n-title{font-weight:700;font-size:13.5px;margin-bottom:6px}
-.notify .n-body{font-size:12.5px;color:var(--dim);line-height:1.6}
-.notify .n-acts{display:flex;gap:8px;margin-top:12px}
-.notify .n-acts button{flex:1;padding:7px 10px;border-radius:9px;border:1px solid var(--line);
-  background:var(--panel2);color:var(--fg);font:inherit;font-size:12px;cursor:pointer}
+/* 完成提示：窗口正中弹出 */
+.notify{position:fixed;inset:0;z-index:180;display:none;place-items:center;padding:24px;
+  background:rgba(12,18,38,.34)}
+.notify.on{display:grid}
+.notify .n-card{width:min(340px,100%);background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;box-shadow:0 18px 44px rgba(0,0,0,.38);padding:20px 20px 16px;
+  text-align:center;animation:notifyIn .16s ease-out}
+@keyframes notifyIn{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+.notify .n-title{font-weight:700;font-size:14px;margin-bottom:8px}
+.notify .n-body{font-size:12.5px;color:var(--dim);line-height:1.65}
+.notify .n-acts{display:flex;gap:8px;margin-top:16px}
+.notify .n-acts button{flex:1;padding:8px 10px;border-radius:9px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--fg);font:inherit;font-size:12.5px;cursor:pointer}
 .notify .n-acts button:hover{border-color:var(--acc);color:var(--acc2)}
+.notify .n-acts #nGo{background:var(--acc);border-color:var(--acc);color:#fff}
+.notify .n-acts #nGo:hover{filter:brightness(1.06);color:#fff}
 
 /* folder tree */
 .tbl tr.grow{cursor:pointer}
@@ -1035,7 +1128,7 @@ input.ck{width:14px;height:14px;accent-color:var(--acc);vertical-align:-2px;marg
 .submitbar.running #runHint{display:none!important}
 
 /* ---- 提交栏与进度卡片的间距 ---- */
-.submitbar{margin-bottom:22px!important}
+.submitbar{margin-bottom:16px!important}
 #progress{margin-top:0!important}
 
 /* ---- 恢复普通进度条 ---- */
@@ -1043,8 +1136,58 @@ input.ck{width:14px;height:14px;accent-color:var(--acc);vertical-align:-2px;marg
 .pbar-track{overflow:hidden!important;height:12px!important}
 #barFill{display:block;height:100%;width:0;border-radius:99px;
   background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .35s ease}
-.pbar{margin-top:20px}
-.pbar-steps{margin-top:10px}
+.pbar{margin-top:14px}
+.pbar-steps{margin-top:8px}
+
+/* ================= 像素皮肤：比熊逐帧领跑进度条 ================= */
+.pbar-dog{display:none}
+
+:root[data-skin="pixel"] .pbar-track{overflow:visible!important;height:18px!important;
+  border:3px solid #4a3b52!important;border-radius:9px!important;background:#fdeef4!important}
+:root[data-skin="pixel"] #barFill{border-radius:4px!important;
+  background:repeating-linear-gradient(135deg,#ffb3c9 0 8px,#ff9dbb 8px 16px)!important;
+  transition:width .35s ease!important}
+
+/* 狗：一个裁切窗口，里面横排 8 帧，靠 translateX 逐帧推进 */
+:root[data-skin="pixel"] .pbar-dog{
+  display:block;position:absolute;top:50%;
+  width:68px;height:36px;overflow:hidden;
+  left:clamp(34px, calc(var(--p, 0) * 1%), calc(100% - 34px));
+  transform:translate(-50%,-72%);
+  transition:left .35s ease;
+  z-index:3;
+  filter:drop-shadow(0 3px 0 rgba(74,59,82,.22));
+}
+:root[data-skin="pixel"] .pbar-dog img{
+  display:block;height:36px;width:auto;image-rendering:pixelated;
+}
+:root[data-skin="pixel"] .pbar-dog .dog-run{
+  width:544px;                     /* 8 帧 × 68px，1:1 无缩放 */
+  animation:dogFrames .88s steps(8, end) infinite;
+}
+@keyframes dogFrames{
+  from{transform:translateX(0)}
+  to  {transform:translateX(-100%)}
+}
+:root[data-skin="pixel"] .pbar-dog .dog-cheer{display:none;width:68px}
+
+/* 100%：换成坐着庆祝的那一帧，原地蹦 */
+:root[data-skin="pixel"] #progress.done .pbar-dog .dog-run{display:none}
+:root[data-skin="pixel"] #progress.done .pbar-dog .dog-cheer{display:block}
+:root[data-skin="pixel"] #progress.done .pbar-dog{
+  left:calc(100% - 6px);
+  animation:dogCheer .85s ease-in-out infinite;
+}
+@keyframes dogCheer{
+  0%,100%{transform:translate(-50%,-58%) scale(1)}
+  40%    {transform:translate(-50%,-78%) scale(1.06)}
+  70%    {transform:translate(-50%,-64%) scale(1.02)}
+}
+/* 跑到终点时脚下留一点"刹车印" */
+:root[data-skin="pixel"] #progress.done .pbar-track::after{
+  content:"";position:absolute;right:2px;bottom:-2px;width:34px;height:4px;
+  background:repeating-linear-gradient(90deg,#e6a8c6 0 6px,transparent 6px 10px);
+  border-radius:2px;opacity:.85}
 
 
 /* ---- 窗口较矮时压缩留白，尽量一屏显示完整内容 ---- */
@@ -1150,3 +1293,72 @@ body:hover .ver-tag{opacity:.6}
 .clean-card .opts.row #cleanGo:hover{background:var(--acc2);border-color:var(--acc2);color:#04121a}
 .clean-card .opts.row #cleanGo:disabled{opacity:.5;cursor:not-allowed}
 @media print{.credit{display:none}}
+
+/* ---- 打印分页修复 ----
+   body 设了 overflow-x:hidden，浏览器会把 overflow-y 算成 auto，
+   于是 body 成为滚动容器、高度又被 height:100% 锁死，打印只出一页。
+   这里必须在文件末尾用 !important 覆盖回来（同优先级时后写的胜）。 */
+@media print{
+  html,body{
+    height:auto!important;min-height:0!important;
+    overflow:visible!important;overflow-x:visible!important;overflow-y:visible!important;
+  }
+  body.printing #printArea{
+    display:block!important;height:auto!important;max-height:none!important;
+    overflow:visible!important;
+  }
+  body.printing #printArea *{max-height:none!important;overflow:visible!important}
+  body.printing #printArea .pr-item{break-inside:avoid}
+}
+
+/* 详情页视图切换：相似句子 / 相似段落 / 相似图片 */
+.vtabs{display:inline-flex;gap:4px;margin-right:4px}
+.vtab{opacity:.75}
+.vtab.on{opacity:1;font-weight:600;border-color:var(--acc2);color:var(--acc2);box-shadow:inset 0 0 0 1px var(--acc2)}
+.vtab:disabled{opacity:.35;cursor:default}
+:root[data-skin="geek"] .vtab.on{background:rgba(57,255,136,.14);border-color:#39ff88;color:#39ff88;box-shadow:none}
+:root[data-skin="pixel"] .vtab.on{background:#ffd0dc;border-color:#4a3b52;color:#4a3b52;box-shadow:2px 2px 0 #4a3b52}
+/* 文档属性重复卡片 */
+.prop-card{margin-top:12px}
+.prop-head{display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13.5px;user-select:none}
+.prop-head:hover{color:var(--acc2)}
+.prop-head .chev{transition:transform .15s}
+.prop-head.open .chev{transform:rotate(90deg)}
+.prop-body{margin-top:10px}
+.prop-body table.tbl{width:100%;table-layout:fixed}
+.prop-body th:nth-child(1){width:68px}
+.prop-body th:nth-child(2){width:180px}
+.prop-body th:nth-child(3){width:72px}
+.prop-body th:nth-child(4){width:152px}
+.prop-body td{vertical-align:middle;line-height:1.55}
+.prop-body td.pval{word-break:break-all;font-weight:500}
+.prop-body td[colspan]{vertical-align:middle}
+.prop-body tr.punit-row td{border-top:1px dashed var(--line)}
+.prop-body td.punit{font-weight:600;color:var(--acc2)}
+.prop-body td.pval{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.prop-body td.pfile{font-size:12px;color:var(--dim);line-height:1.55}
+/* 文档属性表：前三列居中，斑马纹按「一条记录」上色（跨行同色） */
+.prop-body td.ctr{text-align:left}
+.prop-body td.num{text-align:left}
+.prop-body table.tbl tbody tr.pa td{background:transparent}
+.prop-body table.tbl tbody tr.pb td{background:rgba(15,25,60,.045)}
+:root[data-theme="light"] .prop-body table.tbl tbody tr.pa td{background:transparent}
+:root[data-theme="light"] .prop-body table.tbl tbody tr.pb td{background:rgba(15,25,60,.045)}
+:root[data-theme="dark"] .prop-body table.tbl tbody tr.pa td{background:transparent}
+:root[data-theme="dark"] .prop-body table.tbl tbody tr.pb td{background:rgba(255,255,255,.05)}
+.prop-body table.tbl tbody tr:hover td{background:rgba(124,108,255,.12)!important}
+/* 完成态：圆环停止旋转，变成对勾 */
+#progress.done .spinner{
+  animation:none;
+  border-color:var(--acc2);
+  background:var(--acc2);
+  position:relative;
+}
+#progress.done .spinner::after{
+  content:"";
+  position:absolute;left:50%;top:47%;
+  width:10px;height:5px;
+  border-left:2.5px solid #fff;
+  border-bottom:2.5px solid #fff;
+  transform:translate(-50%,-50%) rotate(-45deg);
+}

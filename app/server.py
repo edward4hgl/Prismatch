@@ -1,10 +1,11 @@
-"""Zero-dependency local web server: static UI + JSON API + background jobs."""
+﻿"""Zero-dependency local web server: static UI + JSON API + background jobs."""
 from __future__ import annotations
 
 import base64
 import gzip
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -26,7 +27,7 @@ else:
     APP_ROOT = os.path.dirname(ROOT)
 
 STATIC = os.path.join(ROOT, "static")
-APP_VERSION = "1.1"
+APP_VERSION = "1.1.11"
 LOG_DIR = os.path.join(APP_ROOT, "logs")
 IMG_DIR = os.path.join(APP_ROOT, "data", "images")
 REPORT_DIR = os.path.join(APP_ROOT, "data", "reports")
@@ -38,6 +39,41 @@ try:
     os.makedirs(DOC_DIR, exist_ok=True)
 except Exception:
     LOG_DIR = ROOT
+
+
+def _doc_target(job_id, doc_id):
+    """把「报告里的文档编号」解析成磁盘路径：优先原始路径，退回落盘副本。"""
+    target, source = None, ""
+    meta_path = os.path.join(REPORT_DIR, job_id + ".meta.json")
+    try:
+        with open(meta_path, encoding="utf-8") as fh:
+            meta = json.load(fh)
+        docs = meta.get("docs") or []
+        if isinstance(doc_id, int) and 0 <= doc_id < len(docs):
+            p = docs[doc_id].get("path") or ""
+            if p and os.path.isfile(p):
+                target, source = p, "original"
+    except Exception:
+        pass
+    if target is None:
+        raw = os.path.join(DOC_DIR, job_id, f"d{doc_id}.docx")
+        if os.path.isfile(raw):
+            target, source = raw, "cached"
+    return target, source
+
+
+def _reveal_in_explorer(path):
+    """在资源管理器里打开所在文件夹并选中该文件（不是只打开文件夹）。"""
+    if os.name != "nt":
+        return False, "仅 Windows 支持"
+    try:
+        subprocess.Popen(
+            'explorer /select,"%s"' % path,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+        return True, ""
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
 
 
 def _save_report(job_id, result, files):
@@ -226,9 +262,7 @@ def _list_reports():
             out.append(meta)
         except Exception:
             continue
-    out.sort(key=lambda m: m.get("time", ""), reverse=True)
-    # 报告列表按最高重复率从高到低，重复率相同时新的在前
-    out.sort(key=lambda m: float((m.get("stats") or {}).get("max_score") or 0), reverse=True)
+    out.sort(key=lambda m: str(m.get("time", "")), reverse=True)
     return out
 
 
@@ -797,22 +831,7 @@ class Handler(BaseHTTPRequestHandler):
                 payload = {}
             job_id = str(payload.get("job") or "")
             doc_id = payload.get("doc")
-            meta_path = os.path.join(REPORT_DIR, job_id + ".meta.json")
-            target, source = None, ""
-            try:
-                with open(meta_path, encoding="utf-8") as fh:
-                    meta = json.load(fh)
-                docs = meta.get("docs") or []
-                if isinstance(doc_id, int) and 0 <= doc_id < len(docs):
-                    p = docs[doc_id].get("path") or ""
-                    if p and os.path.isfile(p):
-                        target, source = p, "original"
-            except Exception:
-                pass
-            if target is None:
-                raw = os.path.join(DOC_DIR, job_id, f"d{doc_id}.docx")
-                if os.path.isfile(raw):
-                    target, source = raw, "cached"
+            target, source = _doc_target(job_id, doc_id)
             if not target:
                 self._json({"error": "找不到该文件（原始路径已变更，且没有缓存副本）"}, 404)
                 return
@@ -820,12 +839,29 @@ class Handler(BaseHTTPRequestHandler):
                 if os.name == "nt":
                     os.startfile(target)  # noqa: S606
                 else:
-                    import subprocess
                     subprocess.Popen(["xdg-open", target])
             except Exception as exc:  # noqa: BLE001
                 self._json({"error": f"打开失败: {exc}"}, 500)
                 return
             self._json({"ok": True, "source": source, "path": target})
+            return
+        if u.path == "/api/reveal":
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8-sig")) if length else {}
+            except Exception:
+                payload = {}
+            job_id = str(payload.get("job") or "")
+            doc_id = payload.get("doc")
+            target, source = _doc_target(job_id, doc_id)
+            if not target:
+                self._json({"error": "找不到该文件（原始路径已变更，且没有缓存副本）"}, 404)
+                return
+            ok, err = _reveal_in_explorer(target)
+            if not ok:
+                self._json({"error": f"定位失败: {err}"}, 500)
+                return
+            self._json({"ok": True, "path": target, "source": source})
             return
         if u.path == "/api/paths-info":
             length = int(self.headers.get("Content-Length") or 0)

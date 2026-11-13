@@ -3,7 +3,7 @@
 > 本地标书查重工具。文件夹即投标单位，跨单位两两比对，找出抄袭与围标线索。
 > **Developed by edward4hgl with DSH**
 >
-> 当前版本 **v1.1**（界面左下角常显版本号）
+> 当前版本 **v1.1.11**（界面左下角常显版本号）
 
 Windows 单机版，免安装、不联网、不上传任何文档：解析、比对、出报告全部在本机完成。
 
@@ -27,12 +27,13 @@ Windows 单机版，免安装、不联网、不上传任何文档：解析、比
 | `.docx` | mammoth → HTML（保留表格 / 标题 / 加粗），正文另行抽取用于比对 |
 | `.doc` | 装了 Word 时先转 `.docx` 再走上面的路径（排版一并保留，转换结果按内容哈希缓存）；没有 Word 时回退 OLE 复合文档 + FIB / Clx 分片表取纯文本 |
 | `.pdf` | pypdf 文本层；逐页检查，只有这一页几乎没有文字的才渲染成图用 Windows.Media.Ocr 识别（不设页数上限），结果按页序拼回；报告注明哪几页走过 OCR |
-| `.pptx` / `.ppt` | python-pptx 取文本与备注 |
-| `.xlsx` | openpyxl 取单元格文本 |
+| `.pptx` / `.ppt` | `.ppt` 装了 PowerPoint 时先转 `.pptx`；随后 python-pptx 取文本与备注 |
+| `.xlsx` / `.xls` | `.xls` 装了 Excel 时先转 `.xlsx`；随后 openpyxl 取单元格文本 |
+| `.rtf` | 装了 Word 时转 `.docx` 再走 docx 路径（保留表格与加粗） |
 | `.txt` | 直接读取，自动探测编码 |
 | 图片 | dHash 感知哈希，汉明距离 ≤6 判为同图 |
 
-> `.doc` 排版还原需要本机装 Word（Office）；OCR 需要系统里存在 Windows OCR 语言包（中文简体通常已自带）。两者缺失时自动降级，不会让整个任务失败。
+> 旧格式转换（`.doc` / `.rtf` / `.xls` / `.ppt`）需要本机装 Office（Word / Excel / PowerPoint），转换结果按文件内容哈希缓存在 `data/conv`，同一份文件重复检测不再转换；缺 Office 时自动降级或记为解析失败，不会让整个任务失败。OCR 需要系统里有 Windows OCR 语言包（中文简体通常已自带）。
 
 ## 相似度算法
 
@@ -61,30 +62,16 @@ python run.py --no-browser
 python run_check.py --group 单位A=.\标书A --group 单位B=.\标书B --tender .\招标文件 --out .\结果
 ```
 
-## 打包成免安装目录版
-
-```powershell
-pyinstaller Prismatch.spec
-# 产物：dist\Prismatch\Prismatch.exe
-```
-
-发给别人时把 `Prismatch` 整个文件夹压缩发送即可——解压后双击 `Prismatch.exe` 就能用，不需要装 Python，也不需要管理员权限。首次运行会在同目录下建 `data\`（报告、排版快照、缓存）和 `logs\`，删掉这两个目录等于恢复出厂。
-
-`launcher.py` 用 pywebview（WebView2）把本地服务包成桌面窗口：
-
-- 端口冲突时自动换端口
-- 启动后按屏幕工作区算窗口尺寸并居中（最大 1320×960，最小 1040×640）
-- 关闭窗口即退出服务
-- 文件夹可从资源管理器直接拖进窗口；`--port` 等参数对 exe 同样有效
+`launcher.py` 用 pywebview（WebView2）把本地服务包成桌面窗口：端口冲突时自动换端口；按屏幕工作区计算窗口尺寸并居中；关闭窗口即退出服务；文件夹可从资源管理器直接拖进窗口。
 
 ## 界面
 
-三套皮肤 × 深浅两档，右上角切换，设置会记住：
+三套皮肤，右上角切换，设置会记住：
 
 | 皮肤 | 风格 |
 |---|---|
 | 液态玻璃 `apple` | 毛玻璃、柔和渐变、圆角 |
-| 极客终端 `geek` | 等宽字体、荧光绿、终端质感 |
+| 极客终端 `geek` | 等宽字体、荧光绿、终端质感；正文可单独切到纸面阅读 |
 | 可爱像素 `pixel` | 粗描边、粉紫配色、像素点阵底纹 |
 
 ## 目录结构
@@ -93,8 +80,8 @@ pyinstaller Prismatch.spec
 app/
   server.py      本地 HTTP 服务（标准库 ThreadingHTTPServer）
   engine.py      解析调度、分组、比对、进度与 ETA
-  extract.py     docx/doc/pdf/pptx/xlsx/txt/图片 抽取
-  wordconv.py    旧版 .doc → docx（调用本机 Word，带哈希缓存）
+  extract.py     docx/doc/pdf/pptx/xlsx/rtf/txt/图片 抽取
+  officeconv.py  旧格式 → 现代格式（调用本机 Word / Excel / PowerPoint，按内容哈希缓存）
   ocr.py         扫描件 PDF 渲染 + 调 Windows OCR 并重组行
   ocr_win.ps1    WinRT OCR 桥（Windows PowerShell 5.1）
   text.py        归一化、分句、分词、3-gram、simhash
@@ -123,10 +110,12 @@ vendor/          运行时用到的纯 Python 依赖
 
 ## 已知限制
 
-- OCR 只识别"这一页几乎没有文字"的页（少于 60 字），有文本层的页一律用文本层，所以混合型 PDF 只花扫描页的那点时间；识别质量取决于扫描清晰度，封面、印章、斜排表格容易认错，`options.ocr_max_pages` 可以额外设一个上限
-- `.doc` 的排版还原依赖本机 Word；没装 Word 时只能拿到纯文本，文本框、艺术字可能丢字
+- OCR 只识别「这一页几乎没有文字」的页（少于 60 字），有文本层的页一律用文本层，所以混合型 PDF 只花扫描页的那点时间；识别质量取决于扫描清晰度，封面、红章、斜排表格容易认错。默认不设页数上限，需要时可以给 `options.ocr_max_pages` 传一个上限
+- 旧格式转换需要本机装了 Office：没有 Word，`.doc` / `.rtf` 只能拿到纯文本，`.xls` / `.ppt` 会记为解析失败（不会拖垮整个任务）
+- `.doc` 走 Word 转换时排版能保留；走回退路径时文本框、艺术字可能丢字
 - 图片比对只看感知哈希，不做图片里的文字识别
 - 报告里的排版还原依赖 `.docx` / 转换后的原始样式；PDF 与 OCR 结果是按行重组的文本，没有版式
+- 文档属性重复只列「跨投标单位」的条目：同一单位内部重复（同事互相保存、公司名相同）不展示，因为这本身不构成围标线索
 
 ## 说明
 

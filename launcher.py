@@ -58,6 +58,23 @@ class Api:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
 
+    def reveal_path(self, path: str):
+        """在资源管理器里打开所在文件夹并选中该文件"""
+        try:
+            if not path or not os.path.exists(path):
+                return {"ok": False, "error": "文件不存在"}
+            if os.name != "nt":
+                return {"ok": False, "error": "仅 Windows 支持"}
+            import subprocess
+
+            subprocess.Popen(
+                'explorer /select,"%s"' % path,
+                creationflags=0x08000000,
+            )
+            return {"ok": True}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
 
 def window_geometry():
     """按主屏工作区算出居中、能完整显示界面的窗口尺寸。"""
@@ -73,9 +90,9 @@ def window_geometry():
     except Exception:
         return 1320, 880, 80, 60
 
-    # 界面在 1180px 宽时是双栏最优布局；高度按内容需要给足
-    w = min(1320, max(1040, int(sw * 0.92)))
-    h = min(960, max(700, int(sh * 0.94)))
+    # 界面在 1180px 宽时是双栏最优布局；高度要能放下"导入区 + 进度卡"整屏不滚动
+    w = min(1360, max(1040, int(sw * 0.92)))
+    h = min(1060, max(720, int(sh * 0.94)))
     x = sx + max(0, (sw - w) // 2)
     y = sy + max(0, (sh - h) // 2)
     return w, h, x, y
